@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ছায়ার এজেন্ট — Shadow Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;800&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#080b10; --panel:#0e141d; --line:#1d2a3a; --accent:#43e0c8;
+    --danger:#ff4d5e; --warn:#ffb13b; --text:#dfe8f3; --dim:#7f8fa6;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:radial-gradient(circle at 50% 0%,#101a26,#05070a 70%);
+    color:var(--text);
+    font-family:"Noto Sans Bengali","Hind Siliguri",system-ui,sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    min-height:100vh; overflow:hidden;
+  }
+  #wrap{position:relative; width:min(100vw,1100px); height:min(100vh,700px);}
+  canvas{width:100%; height:100%; display:block; background:#05070a;
+    border:1px solid var(--line); border-radius:10px;
+    box-shadow:0 0 60px rgba(67,224,200,.08), inset 0 0 80px rgba(0,0,0,.6);}
+  .screen{
+    position:absolute; inset:0; display:none; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center;
+    background:linear-gradient(180deg,rgba(5,7,10,.94),rgba(5,7,10,.98));
+    border-radius:10px; padding:34px; z-index:10;
+  }
+  .screen.on{display:flex;}
+  h1{font-family:"Oswald",sans-serif; font-size:clamp(34px,6vw,62px); letter-spacing:6px;
+    color:#fff; text-transform:uppercase; line-height:1;}
+  h1 .sub{display:block; font-family:"Noto Sans Bengali",sans-serif; font-size:18px;
+    letter-spacing:2px; color:var(--accent); margin-top:12px; font-weight:600;}
+  .tag{color:var(--dim); font-size:15px; max-width:640px; margin:18px auto 0; line-height:1.9;}
+  .btn{
+    margin-top:26px; padding:13px 34px; background:transparent; color:var(--accent);
+    border:1px solid var(--accent); border-radius:6px; font-size:17px; font-weight:600;
+    cursor:pointer; font-family:inherit; letter-spacing:1px; transition:.18s;
+  }
+  .btn:hover{background:var(--accent); color:#04121a; box-shadow:0 0 26px rgba(67,224,200,.5);}
+  .keys{margin-top:22px; display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+    gap:8px; max-width:640px; width:100%; font-size:13px; color:var(--dim);}
+  .keys div{background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:8px 10px;}
+  .keys b{color:var(--accent); font-weight:600;}
+
+  /* cutscene */
+  #cs .who{font-family:"Oswald",sans-serif; letter-spacing:3px; color:var(--warn);
+    font-size:15px; text-transform:uppercase; margin-bottom:10px;}
+  #cs .say{max-width:720px; font-size:clamp(16px,2.2vw,21px); line-height:1.95; min-height:110px;}
+  #cs .hint{margin-top:20px; color:var(--dim); font-size:13px; animation:blink 1.6s infinite;}
+  @keyframes blink{0%,100%{opacity:.25}50%{opacity:.9}}
+  #cs .narr{color:var(--accent); font-style:italic;}
+
+  /* hud */
+  #hud{position:absolute; inset:0; pointer-events:none; z-index:5; padding:14px 16px;
+    display:none; flex-direction:column; justify-content:space-between;}
+  #hud.on{display:flex;}
+  .row{display:flex; justify-content:space-between; align-items:flex-start; gap:14px;}
+  .bars{display:flex; flex-direction:column; gap:7px;}
+  .bar{width:220px; height:11px; background:#0b1119; border:1px solid var(--line); border-radius:6px; overflow:hidden;}
+  .bar i{display:block; height:100%; width:100%; transition:width .12s;}
+  .hp i{background:linear-gradient(90deg,#ff4d5e,#ff8b7a);}
+  .st i{background:linear-gradient(90deg,#43e0c8,#8ef0dd);}
+  .al i{background:linear-gradient(90deg,#ffb13b,#ff5f4d);}
+  .lbl{font-size:11px; color:var(--dim); letter-spacing:2px; font-family:"Oswald",sans-serif;}
+  #objbox{background:rgba(14,20,29,.85); border:1px solid var(--line); border-radius:7px;
+    padding:11px 15px; min-width:250px; font-size:14px;}
+  #objbox h4{font-family:"Oswald",sans-serif; letter-spacing:2px; color:var(--accent);
+    font-size:12px; margin-bottom:8px; text-transform:uppercase;}
+  #objbox li{list-style:none; color:var(--dim); padding:3px 0; line-height:1.5;}
+  #objbox li.done{color:#4d6b5e; text-decoration:line-through;}
+  #objbox li.active{color:#fff;}
+  #objbox li:before{content:"▸ "; color:var(--accent);}
+  #mission{font-family:"Oswald",sans-serif; letter-spacing:3px; color:#fff; font-size:15px;
+    text-transform:uppercase; text-shadow:0 0 14px rgba(67,224,200,.6);}
+  #status{font-size:13px; color:var(--dim); margin-top:4px;}
+  #alertflash{position:absolute; inset:0; background:var(--danger); opacity:0;
+    border-radius:10px; pointer-events:none; z-index:6;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+
+  <div id="hud">
+    <div class="row">
+      <div class="bars">
+        <span class="lbl">HEALTH</span><div class="bar hp"><i id="hpbar"></i></div>
+        <span class="lbl">STAMINA</span><div class="bar st"><i id="stbar"></i></div>
+        <span class="lbl">ALARM</span><div class="bar al"><i id="albar" style="width:0%"></i></div>
+      </div>
+      <div style="text-align:right">
+        <div id="mission">MISSION</div>
+        <div id="status"></div>
+      </div>
+    </div>
+    <div class="row">
+      <div id="objbox"><h4>Objectives</h4><ul id="objlist"></ul></div>
+      <div style="font-size:12px;color:var(--dim);text-align:right;line-height:1.9">
+        WASD চলা · SHIFT চুপচাপ<br>JS/ক্লিক = হালকা ঘুষি · KL/Right = ভারী কিক<br>SPACE = ডজ · E = টেকডাউন · P = pause
+      </div>
+    </div>
+  </div>
+  <div id="alertflash"></div>
+
+  <div id="menu" class="screen on">
+    <h1>ছায়ার এজেন্ট<span class="sub">SHADOW AGENT — ఆరంଭ</span></h1>
+    <p class="tag">একজন তরুণ হ্যাকার, একটা ভুল ফাইল, আর এক অদৃশ্য সংস্থা।<br>
+    ওরিজিনাল স্পাই-স্টেলথ অভিজ্ঞতা — ৩টি মিশন, হাতাহাতি লড়াই, আর একটা বিশ্বাসঘাতক।</p>
+    <button class="btn" id="start">শুরু করুন</button>
+    <div class="keys">
+      <div><b>WASD</b> — নড়াচড়া</div>
+      <div><b>SHIFT</b> — চুপচাপ হাঁটা</div>
+      <div><b>J / ক্লিক</b> — হালকা ঘুষি</div>
+      <div><b>K / ডান-ক্লিক</b> — ভারী কিক</div>
+      <div><b>SPACE</b> — ডজ / সাইড-স্টেপ</div>
+      <div><b>E</b> — পিছন থেকে টেকডাউন</div>
+    </div>
+    <p class="tag" style="font-size:12px;margin-top:16px">টিপস: অন্ধকার জায়গায় (গাঢ় বর্গ) লুকিয়ে থাকলে শত্রু আপনাকে দেখতে পায় না।</p>
+  </div>
+
+  <div id="cs" class="screen">
+    <div class="who" id="cswho"></div>
+    <div class="say" id="cssay"></div>
+    <div class="hint">[ SPACE / ক্লিক — পরবর্তী ]</div>
+  </div>
+
+  <div id="pause" class="screen">
+    <h1 style="font-size:40px">বিরতি</h1>
+    <p class="tag">P চেপে খেলায় ফিরে যান</p>
+  </div>
+
+  <div id="over" class="screen">
+    <h1 id="overtitle" style="font-size:44px">শেষ</h1>
+    <p class="tag" id="overtext"></p>
+    <button class="btn" id="again">আবার খেলুন</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================ ছায়ার এজেন্ট — core ============================ */
+const TS = 40;                       // tile size (px)
+const cvs = document.getElementById("game");
+const ctx = cvs.getContext("2d");
+let VW = 0, VH = 0, DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+function resize(){
+  const r = cvs.getBoundingClientRect();
+  VW = r.width; VH = r.height;
+  cvs.width = Math.floor(VW*DPR); cvs.height = Math.floor(VH*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener("resize", resize);
+
+/* ------------------------------- utilities ------------------------------- */
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp  = (a,b,t)=>a+(b-a)*t;
+const dist  = (a,b)=>Math.hypot(a.x-b.x, a.y-b.y);
+function angDiff(a,b){ let d=(a-b)%(Math.PI*2); if(d> Math.PI)d-=Math.PI*2; if(d<-Math.PI)d+=Math.PI*2; return d; }
+function norm(a){ while(a<0)a+=Math.PI*2; while(a>=Math.PI*2)a-=Math.PI*2; return a; }
+const rand = (a,b)=>a+Math.random()*(b-a);
+
+/* --------------------------------- audio --------------------------------- */
+let AC=null;
+function beep(freq, dur, type, vol){
+  try{
+    if(!AC) AC = new (window.AudioContext||window.webkitAudioContext)();
+    const o=AC.createOscillator(), g=AC.createGain();
+    o.type=type||"square"; o.frequency.value=freq;
+    g.gain.setValueAtTime(vol||0.06, AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime+(dur||0.08));
+    o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime+(dur||0.08));
+  }catch(e){}
+}
+const SFX = {
+  punch: ()=>beep(180,.07,"square",.05),
+  heavy: ()=>{beep(110,.13,"sawtooth",.07); beep(70,.18,"square",.05);},
+  hit:   ()=>beep(320,.06,"triangle",.05),
+  dodge: ()=>beep(560,.09,"sine",.04),
+  ko:    ()=>beep(90,.25,"sawtooth",.06),
+  spot:  ()=>{beep(720,.09,"square",.05); setTimeout(()=>beep(900,.12,"square",.05),90);},
+  pickup:()=>beep(880,.12,"sine",.05),
+  fail:  ()=>{beep(200,.3,"sawtooth",.07); setTimeout(()=>beep(120,.4,"sawtooth",.07),140);}
+};
+
+/* --------------------------------- input --------------------------------- */
+const keys = {};
+const mouse = {x:0,y:0,down:false,rdown:false};
+const once = {};
+addEventListener("keydown", e=>{
+  const k=e.key.toLowerCase();
+  if([" ","arrowup","arrowdown","arrowleft","arrowright"].includes(k)) e.preventDefault();
+  if(!keys[k]) once[k]=true;
+  keys[k]=true;
+  if(k==="p" && Game.state==="play") togglePause();
+  if((k===" "||k==="enter") && Game.state==="cutscene") advanceCutscene();
+});
+addEventListener("keyup", e=>{ keys[e.key.toLowerCase()]=false; });
+cvs.addEventListener("mousemove", e=>{
+  const r=cvs.getBoundingClientRect();
+  mouse.x = e.clientX-r.left; mouse.y = e.clientY-r.top;
+});
+cvs.addEventListener("mousedown", e=>{ if(e.button===0)mouse.down=true; if(e.button===2)mouse.rdown=true; e.preventDefault(); });
+cvs.addEventListener("mouseup",   e=>{ if(e.button===0)mouse.down=false; if(e.button===2)mouse.rdown=false; });
+cvs.addEventListener("contextmenu", e=>e.preventDefault());
+
+/* ================================ LEVELS ================================ */
+/* grid chars: '#' wall  '.' floor  ',' shadow  'D' door(floor)  'P' player  'X' exit */
+function blankGrid(w,h){ const g=[]; for(let y=0;y<h;y++){ g.push(new Array(w).fill("#")); } return g; }
+function carve(g,x,y,w,h,ch){ ch=ch||"."; for(let j=y;j<y+h;j++) for(let i=x;i<x+w;i++){ if(g[j]&&g[j][i]!==undefined) g[j][i]=ch; } }
+function setTile(g,x,y,ch){ if(g[y]&&g[y][x]!==undefined) g[y][x]=ch; }
+
+const LEVELS = [
+/* ---------------------------- MISSION 1: AKADEMI ---------------------------- */
+{
+  name:"মিশন ১ · আকাদেমি",
+  w:38, h:22,
+  build(){
+    const g = blankGrid(this.w,this.h);
+    carve(g,1,1,15,8);          // training hall (start)
+    carve(g,20,1,16,8);         // archive room (objective)
+    carve(g,16,4,4,3);          // connector
+    carve(g,18,9,3,6);          // vertical corridor
+    carve(g,1,16,16,5);         // lower hall
+    carve(g,20,16,16,5);        // exit hall
+    carve(g,17,17,3,3);         // lower connector
+    carve(g,5,4,2,2,",");       // shadows
+    carve(g,24,3,4,4,",");
+    carve(g,28,16,4,4,",");
+    setTile(g,4,4,"#"); setTile(g,10,7,"#"); setTile(g,24,5,"#"); setTile(g,30,4,"#");
+    setTile(g,6,18,"#"); setTile(g,12,18,"#"); setTile(g,26,18,"#"); setTile(g,33,18,"#");
+    setTile(g,17,4,"D"); setTile(g,18,4,"D"); setTile(g,19,4,"D");
+    return g;
+  },
+  start:{x:3.5,y:3.5},
+  exit:{x:34.5,y:18.5},
+  enemies:[
+    {x:12.5,y:6.5, kind:"guard", path:[[12.5,6.5],[12.5,2.5],[15.5,2.5],[15.5,6.5]]},
+    {x:33.5,y:2.5, kind:"guard", path:[[33.5,2.5],[23.5,2.5],[23.5,6.5],[33.5,6.5]]},
+    {x:6.5,y:19.5, kind:"patrol", path:[[6.5,19.5],[14.5,19.5],[14.5,17.5],[4.5,17.5]]},
+    {x:33.5,y:19.5, kind:"guard", path:[[33.5,19.5],[22.5,19.5],[22.5,17.5],[33.5,17.5]]},
+    {x:19.5,y:13.5, kind:"patrol", path:[[19.5,12.5],[19.5,14.5]]}
+  ],
+  objectives:[
+    {type:"collect", x:26.5, y:5.5, label:"আর্কাইভ থেকে এনক্রিপ্টেড ফাইল নাও"},
+    {type:"reach",   x:34.5, y:18.5, label:"নিরাপদ বিন্দুতে ফিরে যাও"}
+  ],
+  intro:[
+    {who:"", text:"সংস্থা। কেউ জানে না এর নাম। কেউ জানে না এর ঠিকানা।", narr:true},
+    {who:"", text:"আর তুমি — আরভ — তিন মাস আগেও ছিলে একজন আইটি ইঞ্জিনিয়ারের ছেলে, যে রাত জেগে সিস্টেম হ্যাক করত।", narr:true},
+    {who:"শিরিন", text:"আরভ, আজ তোমার শেষ পরীক্ষা। আকাদেমির আর্কাইভে একটা ফাইল আছে — চুরি করে বের করে আনবে।"},
+    {who:"আরভ", text:"আর গার্ডরা?"},
+    {who:"শিরিন", text:"ঘুম পাড়াবে। খুন করবে না। সংস্থার প্রথম নিয়ম — কোনো লাশ নয়।"},
+    {who:"শিরিন", text:"অন্ধকারে থাকো। পিছন থেকে কাছে যাও। আর নিজের ছায়াকে বিশ্বাস করো।"}
+  ],
+  outro:[
+    {who:"শিরিন", text:"তিন মিনিট চুয়াল্লিশ সেকেন্ড। রেকর্ড ভেঙে দিলে, রিক্রুট।"},
+    {who:"আরভ", text:"ফাইলটা... এটা কোনো সাধারণ নথি না।"},
+    {who:"শিরিন", text:"জানি। আর সেজন্যই তোমাকে বেছে নিয়েছি। এখন বাড়ি চলো — পরের মিশনটা কঠিন।"}
+  ]
+},
+
+/* ---------------------------- MISSION 2: দূতাবাস ---------------------------- */
+{
+  name:"মিশন ২ · রাতের দূতাবাস",
+  w:42, h:22,
+  build(){
+    const g = blankGrid(this.w,this.h);
+    carve(g,1,1,12,6);              // west wing
+    carve(g,1,9,12,6);
+    carve(g,14,3,3,10);             // vertical hall
+    carve(g,18,1,13,8);             // grand hall
+    carve(g,18,11,13,8);
+    carve(g,33,1,8,18);             // east wing (objective/rescue)
+    carve(g,13,15,5,4);
+    carve(g,4,3,3,2,",");
+    carve(g,22,3,5,3,",");
+    carve(g,20,15,6,3,",");
+    carve(g,36,8,3,4,",");
+    setTile(g,8,12,"#"); setTile(g,24,6,"#"); setTile(g,27,15,"#");
+    setTile(g,15,7,"D"); setTile(g,15,8,"D"); setTile(g,16,7,"D");
+    setTile(g,30,4,"#"); setTile(g,5,6,"#");
+    return g;
+  },
+  start:{x:3.5,y:3.5},
+  exit:{x:3.5,y:12.5},
+  enemies:[
+    {x:8.5,y:4.5, kind:"guard", path:[[8.5,4.5],[10.5,4.5],[10.5,5.5],[3.5,5.5]]},
+    {x:24.5,y:2.5, kind:"guard", path:[[24.5,2.5],[19.5,2.5],[19.5,7.5],[29.5,7.5]]},
+    {x:24.5,y:17.5, kind:"guard", path:[[24.5,17.5],[28.5,17.5],[28.5,12.5],[19.5,12.5]]},
+    {x:38.5,y:4.5, kind:"elite", path:[[38.5,4.5],[38.5,8.5],[36.5,8.5],[36.5,4.5]]},
+    {x:39.5,y:15.5, kind:"elite", path:[[39.5,15.5],[34.5,15.5],[34.5,17.5],[39.5,17.5]]},
+    {x:10.5,y:11.5, kind:"patrol", path:[[10.5,11.5],[3.5,11.5]]},
+    {x:16.5,y:12.5, kind:"patrol", path:[[16.5,4.5],[16.5,12.5]]}
+  ],
+  objectives:[
+    {type:"reach",   x:38.5, y:11.5, label:"পূর্ব প্রান্তে তথ্যদাতা নীলার কাছে পৌঁছাও"},
+    {type:"collect", x:38.5, y:11.5, label:"নীলাকে帶著 বেরিয়ে এসো (তার কাছে গেলেই হবে)"},
+    {type:"reach",   x:3.5,  y:12.5, label:"নিরাপদ বিন্দুতে ফিরে যাও"}
+  ],
+  intro:[
+    {who:"", text:"কায়রো। দূতাবাসের ককটেল পার্টির আলো নিভে গেছে ঘড়ি ধরে।", narr:true},
+    {who:"শিরিন", text:"এলিট গার্ড আছে ভিতরে — ওরা তোমাকে দেখলে কফিনে ঢুকিয়ে দেবে। আজ গুলি চলবে না, আরভ।"},
+    {who:"আরভ", text:"তাহলে?"},
+    {who:"শিরিন", text:"তোমার হাত দুটোই তোমার অস্ত্র। ঘুষি, কিক, আর ওদের নিজের দিকভ্রান্ত ব্যবহার করো।"},
+    {who:"শিরিন", text:"আর একটা কথা — নীলা আমাদের। তাকে বাঁচাও, বাকিটা আমরা দেখব।"}
+  ],
+  outro:[
+    {who:"নীলা", text:"বছর দু'য়েক আগে থেকেই কেউ আমাদের ভিতরে বাস করছে, আরভ।"},
+    {who:"আরভ", text:"কে?"},
+    {who:"নীলা", text:"ফাইলটার কোড-নেম ছিল 'প্রচ্ছন্ন'। আর তোমাদের ট্রেনিং রেকর্ডে হাত ছিল ওই একজনেরই।"}
+  ]
+},
+
+/* --------------------------- MISSION 3: ঢাল ভাঙা --------------------------- */
+{
+  name:"মিশন ৩ · ঢাল ভাঙা",
+  w:44, h:24,
+  build(){
+    const g = blankGrid(this.w,this.h);
+    carve(g,1,1,10,6);              // entry
+    carve(g,12,3,4,16);             // long spine
+    carve(g,17,1,11,10);            // main hall
+    carve(g,17,13,11,9);            // lower hall
+    carve(g,29,1,14,9);             // lab
+    carve(g,29,11,14,11);           // vault
+    carve(g,29,10,14,2);            // vault doorway
+    carve(g,4,3,3,2,",");
+    carve(g,22,4,5,5,",");
+    carve(g,20,16,6,4,",");
+    carve(g,33,3,4,4,",");
+    carve(g,34,15,6,5,",");
+    setTile(g,20,5,"#"); setTile(g,25,8,"#"); setTile(g,36,5,"#"); setTile(g,38,18,"#"); setTile(g,7,4,"#");
+    setTile(g,18,4,"D"); setTile(g,19,4,"D"); setTile(g,20,4,"D");
+    setTile(g,31,10,"D"); setTile(g,32,10,"D");
+    return g;
+  },
+  start:{x:3.5,y:4.5},
+  exit:{x:3.5,y:4.5},
+  enemies:[
+    {x:13.5,y:5.5, kind:"elite", path:[[13.5,4.5],[13.5,17.5]]},
+    {x:22.5,y:2.5, kind:"guard", path:[[22.5,2.5],[27.5,2.5],[27.5,9.5],[18.5,9.5]]},
+    {x:22.5,y:20.5, kind:"elite", path:[[22.5,20.5],[27.5,20.5],[27.5,15.5],[18.5,15.5]]},
+    {x:35.5,y:3.5, kind:"elite", path:[[35.5,3.5],[41.5,3.5],[41.5,8.5],[31.5,8.5]]},
+    {x:38.5,y:13.5, kind:"guard", path:[[38.5,13.5],[41.5,13.5],[41.5,19.5],[33.5,19.5]]},
+    {x:33.5,y:21.5, kind:"elite", path:[[33.5,21.5],[41.5,21.5],[41.5,16.5]]},
+    {x:6.5,y:2.5, kind:"patrol", path:[[6.5,2.5],[9.5,2.5],[9.5,5.5],[3.5,5.5]]},
+    {x:13.5,y:12.5, kind:"patrol", path:[[13.5,10.5],[13.5,13.5]]},
+    {x:31.5,y:6.5, kind:"elite", path:[[31.5,2.5],[31.5,8.5]]}
+  ],
+  boss:{x:38.5,y:18.5, hp:220, name:"প্রচ্ছন্ন"},
+  objectives:[
+    {type:"reach",   x:33.5, y:5.5, label:"ল্যাবে ঢুকে সত্যের প্রমাণ সংগ্রহ করো"},
+    {type:"reach",   x:36.5, y:14.5,label:"ভল্টে নামো — কাবিলের মুখোমুখি হও"},
+    {type:"defeat",  label:"প্রচ্ছন্নকে (কাবিল) হারাও"},
+    {type:"reach",   x:3.5,  y:4.5, label:"বেরিয়ে আসো — বেরিয়ে পড়ো ভোরের আলোয়"}
+  ],
+  intro:[
+    {who:"", text:"শেষ রাত। একটি পরিত্যক্ত গবেষণাগার, নদীর ধারে। এখানেই সব শেষ হবে।", narr:true},
+    {who:"শিরিন", text:"আরভ, শুনো। ওই ভিতরে থাকা মানুষটাকে আমরা বিশ্বাস করতাম। সে তোমাকে ট্রেনিং দিয়েছে।"},
+    {who:"আরভ", text:"কাবিল..."},
+    {who:"শিরিন", text:"কোড-নেম প্রচ্ছন্ন। জন্ম দিয়েছে সাতজন এজেন্টের মৃত্যুর। আজ তাকে নামিয়ে আনবে।"},
+    {who:"শিরিন", text:"সে তোমার চেয়ে শক্ত। কিন্তু তুমি তার চেয়ে ধৈর্যশীল। দরকার হলে লুকাও, সময় নাও — তাড়াহুড়ো করো না।"}
+  ],
+  outro:[
+    {who:"কাবিল", text:"তুমি... এখনো বিশ্বাস করো সংস্থা তোমাকে রক্ষা করবে?"},
+    {who:"আরভ", text:"না। কিন্তু আমি এখন জানি কাকে রক্ষা করতে হবে।"},
+    {who:"শিরিন", text:"ভালো কাজ, এজেন্ট আরভ। সংস্থা এখন তোমার।"},
+    {who:"", text:"— সমাপ্ত —", narr:true}
+  ]
+}
+];
+
+/* ================================ GAME ================================ */
+const Game = {
+  state:"menu",            // menu | cutscene | play | pause | over
+  levelIndex:0,
+  level:null, grid:null, W:0, H:0,
+  player:null, enemies:[], objectives:[], effects:[],
+  cam:{x:0,y:0},
+  cutscene:null, csAfter:null, csIndex:0, csTyped:0, csTarget:"",
+  alarm:0, shake:0, time:0, shadowKills:0, spotted:false, graceT:0
+};
+
+function makePlayer(sp){
+  return { x:sp.x*TS, y:sp.y*TS, r:13, hp:100, maxhp:100,
+    st:100, maxst:100, angle:0, speed:190,
+    attacking:0, atkKind:null, atkCd:0, dodge:0, dodgeCd:0, invul:0,
+    kd:false, hitFlash:0, takenDown:false, sneaking:false };
+}
+function makeEnemy(e, idx){
+  const isBoss = e.kind==="boss";
+  const base = { guard:{hp:45,spd:82,vr:300,vf:1.7,dmg:9},
+                 patrol:{hp:35,spd:70,vr:320,vf:1.9,dmg:7},
+                 elite:{hp:70,spd:96,vr:360,vf:1.6,dmg:13},
+                 boss:{hp:e.hp||220,spd:120,vr:420,vf:1.9,dmg:18} }[e.kind] || {hp:40,spd:80,vr:300,vf:1.7,dmg:9};
+  return {
+    id:idx, kind:e.kind||"guard", boss:isBoss, name:e.name||null,
+    x:e.x*TS, y:e.y*TS, r:13, angle:0, home:{x:e.x,y:e.y},
+    path:(e.path||[]).map(p=>({x:p[0]*TS, y:p[1]*TS})), wp:0,
+    hp:base.hp, maxhp:base.hp, spd:base.spd, vr:base.vr, vf:base.vf, dmg:base.dmg,
+    state:"patrol", detect:0, lastSeen:null, alertT:0, attackCd:0, windup:0,
+    stun:0, dead:false, hitFlash:0, chaseT:0, target:false, patrolPause:0
+  };
+}
+
+/* ---------------------------- level loading ---------------------------- */
+function loadLevel(i){
+  Game.levelIndex = i;
+  const def = LEVELS[i];
+  Game.level = def;
+  Game.grid = def.build();
+  Game.W = def.w; Game.H = def.h;
+  Game.enemies = [];
+  let idx=0;
+  def.enemies.forEach(e=> Game.enemies.push(makeEnemy(e, idx++)));
+  if(def.boss){ Game.enemies.push(makeEnemy(Object.assign({kind:"boss"}, def.boss), idx++));
+    Game.enemies[Game.enemies.length-1].target = true; }
+  Game.objectives = def.objectives.map(o=>Object.assign({done:false}, o));
+  Game.player = makePlayer(def.start);
+  Game.cam.x = 0; Game.cam.y = 0;
+  Game.alarm = 0; Game.effects = []; Game.shake=0; Game.time=0; Game.graceT = 2.5;
+  Game.spotShown = false;
+  document.getElementById("mission").textContent = def.name;
+  renderObjectives();
+  startCutscene(def.intro, ()=> startPlay());
+}
+
+function tileAt(tx,ty){
+  if(ty<0||ty>=Game.H||tx<0||tx>=Game.W) return "#";
+  return Game.grid[ty][tx];
+}
+function solidAtPx(x,y){
+  const t = tileAt(Math.floor(x/TS), Math.floor(y/TS));
+  return t==="#";
+}
+function inShadow(x,y){
+  const t = tileAt(Math.floor(x/TS), Math.floor(y/TS));
+  return t===",";
+}
+function losClear(ax,ay,bx,by){
+  const dx=bx-ax, dy=by-ay, d=Math.hypot(dx,dy), steps=Math.ceil(d/12);
+  for(let s=1;s<steps;s++){
+    const t=s/steps;
+    if(solidAtPx(ax+dx*t, ay+dy*t)) return false;
+  }
+  return true;
+}
+
+/* ------------------------------ cutscenes ------------------------------ */
+const elCS = document.getElementById("cs");
+const elWho = document.getElementById("cswho");
+const elSay = document.getElementById("cssay");
+
+function startCutscene(lines, after){
+  Game.state="cutscene"; Game.cutscene=lines.slice(); Game.csIndex=0; Game.csAfter=after||null;
+  Game.csTyped=0; Game.csTarget = lines.length? lines[0].text : "";
+  elCS.classList.add("on");
+  elCS.onclick = ()=>{ if(Game.state==="cutscene") advanceCutscene(); };
+  elCS.ontouchstart = (e)=>{ e.preventDefault(); if(Game.state==="cutscene") advanceCutscene(); };
+  showCutsceneLine();
+  clearInterval(Game._typeTimer);
+  Game._typeTimer = setInterval(()=>{
+    if(Game.state!=="cutscene") return;
+    if(Game.csTyped < Game.csTarget.length) Game.csTyped += 1;
+  }, 22);
+}
+function showCutsceneLine(){
+  const l = Game.cutscene[Game.csIndex];
+  if(!l) return;
+  elWho.textContent = l.who || "";
+  elWho.style.color = l.narr ? "#43e0c8" : "#ffb13b";
+  Game.csTarget = l.text; Game.csTyped = 0;
+  elSay.className = "say" + (l.narr?" narr":"");
+}
+function advanceCutscene(){
+  if(Game.csTyped < Game.csTarget.length){ Game.csTyped = Game.csTarget.length; return; }
+  Game.csIndex++;
+  if(Game.csIndex >= Game.cutscene.length){
+    clearInterval(Game._typeTimer);
+    elCS.classList.remove("on");
+    const cb = Game.csAfter; Game.csAfter=null; Game.cutscene=null;
+    if(cb) cb();
+    return;
+  }
+  showCutsceneLine();
+}
+
+function startPlay(){ Game.state="play"; resize(); }
+function togglePause(){
+  if(Game.state==="play"){ Game.state="pause"; document.getElementById("pause").classList.add("on"); }
+  else if(Game.state==="pause"){ Game.state="play"; document.getElementById("pause").classList.remove("on"); }
+}
+
+/* ------------------------------ objectives ------------------------------ */
+function renderObjectives(){
+  const ul = document.getElementById("objlist");
+  ul.innerHTML = Game.objectives.map(o=>
+    `<li class="${o.done?'done':''}">${o.label}</li>`).join("");
+}
+function updateObjectives(){
+  const p = Game.player;
+  Game.objectives.forEach(o=>{
+    if(o.done) return;
+    if(o.type==="collect" || o.type==="reach"){
+      if(Math.hypot(p.x-o.x*TS, p.y-o.y*TS) < 32){ o.done=true; SFX.pickup(); renderObjectives(); }
+    } else if(o.type==="defeat"){
+      const boss = Game.enemies.find(e=>e.target);
+      if(boss && boss.dead){ o.done=true; renderObjectives(); }
+    }
+  });
+  // exit only opens once everything else is done
+  const last = Game.objectives[Game.objectives.length-1];
+  const othersDone = Game.objectives.slice(0,-1).every(o=>o.done);
+  if(othersDone && !last.done){
+    if(Math.hypot(p.x-Game.level.exit.x*TS, p.y-Game.level.exit.y*TS) < 30){
+      last.done = true; renderObjectives(); winMission();
+    }
+  }
+}
+function winMission(){
+  Game.state="cutscene";
+  setTimeout(()=>{
+    if(Game.levelIndex < LEVELS.length-1){
+      startCutscene(Game.level.outro, ()=>{
+        loadLevel(Game.levelIndex+1);
+      });
+    } else {
+      startCutscene(Game.level.outro, ()=> endGame(true, "মিশন সম্পন্ন",
+        "তুমি 'ছায়ার এজেন্ট' হয়ে উঠলে। তিনটি মিশন, একটি বিশ্বাসঘাতক, আর একটি নতুন সূচনা — সব শেষ।"));
+    }
+  }, 350);
+}
+function endGame(win, title, text){
+  const ov = document.getElementById("over");
+  document.getElementById("overtitle").textContent = title;
+  document.getElementById("overtitle").style.color = win ? "#43e0c8" : "#ff4d5e";
+  document.getElementById("overtext").textContent = text;
+  ov.classList.add("on"); Game.state="over";
+  if(!win) SFX.fail();
+}
+
+/* -------------------------------- combat -------------------------------- */
+function spawnEffect(x,y,color,life,size){
+  Game.effects.push({x,y,color,life:life||.25,max:life||.25,size:size||22, kind:"ring"});
+}
+function spawnText(x,y,text,color){
+  Game.effects.push({x,y,text,color:color||"#fff",life:.8,max:.8,kind:"text"});
+}
+
+function playerAttack(kind){
+  const p = Game.player;
+  if(p.atkCd>0 || p.dodge>0 || p.kd) return;
+  if(kind==="light"){
+    if(p.st<8) return; p.st-=8; p.atkCd=.32; p.attacking=.16; p.atkKind="light"; SFX.punch();
+  } else {
+    if(p.st<24) return; p.st-=24; p.atkCd=.85; p.attacking=.32; p.atkKind="heavy"; SFX.heavy();
+  }
+  const range = kind==="light"?42:52, arc = kind==="light"?1.15:.85, dmg = kind==="light"?13:30;
+  let hits=0;
+  Game.enemies.forEach(e=>{
+    if(e.dead) return;
+    const d = Math.hypot(e.x-p.x, e.y-p.y);
+    if(d < range + e.r && Math.abs(angDiff(Math.atan2(e.y-p.y,e.x-p.x), p.angle)) < arc){
+      hmm(e, dmg, kind, p);
+      hits++;
+    }
+  });
+  spawnEffect(p.x+Math.cos(p.angle)*26, p.y+Math.sin(p.angle)*26, kind==="light"?"#bff8ee":"#ffd08a", .18, kind==="light"?18:26);
+  if(hits) SFX.hit();
+}
+function hmm(e, dmg, kind, src){
+  e.hp -= dmg; e.hitFlash=.18;
+  const a = Math.atan2(e.y-src.y, e.x-src.x);
+  const kb = kind==="heavy"?26:12;
+  tryMove(e, Math.cos(a)*kb, Math.sin(a)*kb);
+  spawnText(e.x, e.y-e.r-6, "-"+dmg, "#ff8b7a");
+  if(e.hp<=0){ e.hp=0; e.dead=true; e.state="dead"; SFX.ko();
+    spawnEffect(e.x,e.y,"#ff4d5e",.5,40); }
+  else { alertEnemy(e, src, true); }
+}
+function alertEnemy(e, src, force){
+  if(e.dead) return;
+  e.state = "chase"; e.detect = 1; e.lastSeen = {x:src.x,y:src.y};
+  e.chaseT = 4;
+  if(!Game.spotShown){ Game.spotShown=true; SFX.spot(); }
+  Game.alarm = clamp(Game.alarm+8, 0, 100);
+}
+
+function tryMove(ent, dx, dy){
+  const nx = ent.x+dx, ny = ent.y+dy;
+  if(!solidAtPx(nx-ent.r*.6, ent.y) && !solidAtPx(nx+ent.r*.6, ent.y)) ent.x = nx;
+  if(!solidAtPx(ent.x, ny-ent.r*.6) && !solidAtPx(ent.x, ny+ent.r*.6)) ent.y = ny;
+}
+
+function takedown(){
+  const p=Game.player;
+  if(p.kd||p.dodge>0) return;
+  let best=null, bd=1e9;
+  Game.enemies.forEach(e=>{
+    if(e.dead||e.boss) return;
+    if(e.state==="chase") return;
+    const d=Math.hypot(e.x-p.x,e.y-p.y);
+    if(d<48+e.r && d<bd){
+      const facingToPlayer = Math.abs(angDiff(Math.atan2(p.y-e.y,p.x-e.x), e.angle));
+      if(facingToPlayer > 1.5){ best=e; bd=d; }   // player is behind enemy
+    }
+  });
+  if(best){
+    best.dead=true; best.state="dead"; best.hp=0;
+    spawnEffect(best.x,best.y,"#43e0c8",.45,34);
+    spawnText(best.x,best.y-best.r-6,"টেকডাউন","#43e0c8");
+    SFX.ko(); Game.shadowKills++;
+    Game.alarm = clamp(Game.alarm-6,0,100);
+  }
+}
+
+/* --------------------------------- update --------------------------------- */
+function update(dt){
+  if(Game.state!=="play") { 
+    if(Game.state==="cutscene"){
+      const l = Game.cutscene && Game.cutscene[Game.csIndex];
+      if(l) elSay.textContent = l.text.slice(0, Game.csTyped);
+      else elSay.textContent="";
+    }
+    return; 
+  }
+  Game.time += dt;
+  Game.graceT = Math.max(0, Game.graceT - dt);
+  const p = Game.player;
+
+  /* ---- player input ---- */
+  let ix=0, iy=0;
+  if(keys["a"]||keys["arrowleft"]) ix-=1;
+  if(keys["d"]||keys["arrowright"]) ix+=1;
+  if(keys["w"]||keys["arrowup"]) iy-=1;
+  if(keys["s"]||keys["arrowdown"]) iy+=1;
+  p.sneaking = !!keys["shift"];
+  const len = Math.hypot(ix,iy) || 1;
+  ix/=len; iy/=len;
+
+  if((mouse.down||keys["j"]) && p.atkCd<=0 && p.dodge<=0) playerAttack("light");
+  if((mouse.rdown||keys["k"]) && p.atkCd<=0 && p.dodge<=0) playerAttack("heavy");
+  if(once["e"]){ takedown(); }
+  if((once[" "]||once["l"]) && p.dodgeCd<=0 && p.st>=15){
+    p.dodge=.24; p.dodgeCd=.7; p.invul=.3; p.st-=15; SFX.dodge();
+    p.dodgeDir = (ix||iy) ? {x:ix,y:iy} : {x:Math.cos(p.angle),y:Math.sin(p.angle)};
+  }
+
+  /* ---- player movement ---- */
+  const baseSpd = p.sneaking ? p.speed*0.45 : p.speed;
+  if(p.dodge>0){
+    tryMove(p, p.dodgeDir.x*430*dt, p.dodgeDir.y*430*dt);
+    p.dodge-=dt;
+  } else if(!p.kd){
+    tryMove(p, ix*baseSpd*dt, iy*baseSpd*dt);
+  }
+  p.angle = Math.atan2(mouse.y - (p.y-Game.cam.y), mouse.x - (p.x-Game.cam.x));
+  if(ix||iy){ /* keep */ }
+  p.atkCd = Math.max(0,p.atkCd-dt); p.dodgeCd = Math.max(0,p.dodgeCd-dt);
+  p.attacking = Math.max(0,p.attacking-dt); p.invul = Math.max(0,p.invul-dt);
+  p.hitFlash = Math.max(0,p.hitFlash-dt);
+  p.st = clamp(p.st + (p.sneaking?24:14)*dt, 0, p.maxst);
+
+  const hidden = inShadow(p.x,p.y) && p.sneaking;
+
+  /* ---- enemies ---- */
+  Game.enemies.forEach(e=>{
+    if(e.dead) return;
+    e.hitFlash = Math.max(0,e.hitFlash-dt);
+    e.attackCd = Math.max(0,e.attackCd-dt);
+    if(e.stun>0){ e.stun-=dt; return; }
+
+    const d = Math.hypot(p.x-e.x, p.y-e.y);
+    const angleTo = Math.atan2(p.y-e.y, p.x-e.x);
+    let seeRange = e.vr;
+    if(hidden) seeRange *= 0.22;
+    else if(p.sneaking) seeRange *= 0.7;
+    const canSee = Game.graceT<=0 && d < seeRange && Math.abs(angDiff(angleTo, e.angle)) < e.vf && losClear(e.x,e.y,p.x,p.y);
+
+    if(canSee){
+      e.detect = clamp(e.detect + (1.6 + (p.sneaking?0:-0.5))*dt, 0, 1);
+      e.lastSeen = {x:p.x, y:p.y};
+      if(e.detect>=1 && e.state!=="chase"){
+        e.state="chase"; e.chaseT=5; SFX.spot();
+        Game.alarm = clamp(Game.alarm+6,0,100);
+      } else if(e.detect>0.35 && e.state==="patrol"){
+        e.state="suspicious";
+      }
+    } else {
+      e.detect = clamp(e.detect - 0.55*dt, 0, 1);
+      if(e.state==="suspicious" && e.detect<=0.02) e.state="patrol";
+    }
+
+    if(e.state==="chase"){
+      e.chaseT -= dt;
+      if(!canSee && e.chaseT<=0){ e.state="suspicious"; }
+      const tx = e.lastSeen? e.lastSeen.x : p.x, ty = e.lastSeen? e.lastSeen.y : p.y;
+      const dd = Math.hypot(tx-e.x, ty-e.y);
+      if(dd > e.r+e.r+4){ tryMove(e, Math.cos(Math.atan2(ty-e.y,tx-e.x))*e.spd*1.12*dt,
+                                    Math.sin(Math.atan2(ty-e.y,tx-e.x))*e.spd*1.12*dt); }
+      if(d < e.r + p.r + 12 && e.attackCd<=0){
+        e.attackCd = e.boss? .95 : 1.25;
+        e.windup = e.boss? .35 : .5;
+        e.pendingHit = true;
+      }
+    } else if(e.state==="suspicious"){
+      if(e.lastSeen){
+        const dd = Math.hypot(e.lastSeen.x-e.x, e.lastSeen.y-e.y);
+        if(dd>14) tryMove(e, Math.cos(Math.atan2(e.lastSeen.y-e.y,e.lastSeen.x-e.x))*e.spd*.7*dt,
+                              Math.sin(Math.atan2(e.lastSeen.y-e.y,e.lastSeen.x-e.x))*e.spd*.7*dt);
+      }
+    } else { /* patrol */
+      if(e.path && e.path.length){
+        const wp = e.path[e.wp];
+        const dd = Math.hypot(wp.x-e.x, wp.y-e.y);
+        if(dd < 8){
+          e.patrolPause -= dt;
+          if(e.patrolPause<=0){ e.patrolPause = 1.2; e.wp = (e.wp+1)%e.path.length; }
+        } else {
+          const a = Math.atan2(wp.y-e.y, wp.x-e.x);
+          tryMove(e, Math.cos(a)*e.spd*dt, Math.sin(a)*e.spd*dt);
+          e.angle = a;
+        }
+      }
+    }
+
+    // face travel / player when engaged
+    if(e.state==="chase"||e.state==="suspicious"){
+      e.angle = angleTo;
+    } else if(!e.path || !e.path.length){
+      e.angle = angleTo;
+    }
+
+    // resolve windup hit
+    if(e.windup>0){
+      e.windup -= dt;
+      if(e.windup<=0 && e.pendingHit){
+        e.pendingHit=false;
+        if(Math.hypot(p.x-e.x,p.y-e.y) < e.r+p.r+22 && p.invul<=0 && !p.kd){
+          p.hp -= e.dmg; p.hitFlash=.3; Game.shake=9;
+          spawnEffect(p.x,p.y,"#ff4d5e",.3,30); spawnText(p.x,p.y-20,"-"+e.dmg,"#ff4d5e");
+          SFX.hit();
+          if(p.hp<=0) failMission();
+        }
+      }
+    }
+  });
+
+  // alarm drain
+  Game.alarm = clamp(Game.alarm - 3*dt, 0, 100);
+  if(Game.alarm>=100) failMission();
+
+  updateObjectives();
+
+  // camera
+  const tx = clamp(p.x - VW/2, 0, Math.max(0,Game.W*TS - VW));
+  const ty = clamp(p.y - VH/2, 0, Math.max(0,Game.H*TS - VH));
+  Game.cam.x = lerp(Game.cam.x, tx, 1-Math.pow(0.001,dt));
+  Game.cam.y = lerp(Game.cam.y, ty, 1-Math.pow(0.001,dt));
+
+  Game.shake = Math.max(0, Game.shake - 40*dt);
+  Game.effects.forEach(fx=> fx.life -= dt);
+  Game.effects = Game.effects.filter(fx=> fx.life>0);
+
+  updateHUD(hidden);
+  for(const k in once) once[k]=false;
+}
+
+function failMission(){
+  if(Game.state!=="play") return;
+  endGame(false, "মিশন ব্যর্থ", "সতর্কতা সীমা ছাড়িয়ে গেছে, অথবা তুমি ধর পড়েছ। আবার চেষ্টা করো — ছায়া আরও ধৈর্যশীল।");
+}
+
+function updateHUD(hidden){
+  const p=Game.player;
+  document.getElementById("hpbar").style.width = (p.hp/p.maxhp*100)+"%";
+  document.getElementById("stbar").style.width = (p.st/p.maxst*100)+"%";
+  document.getElementById("albar").style.width = Game.alarm+"%";
+  let s = Game.enemies.filter(e=>!e.dead && e.state==="chase").length;
+  let st = s>0 ? "⚠ ধরা পড়েছ — পালাও বা লড়ো!" : (hidden? "ছায়ায় লুকিয়ে আছ" : (p.sneaking? "চুপচাপ হাঁটছ" : ""));
+  document.getElementById("status").textContent = st;
+  const fl = document.getElementById("alertflash");
+  fl.style.opacity = Game.player.hitFlash>0 ? (Game.player.hitFlash*1.2) : (Game.alarm>70? 0.12 : 0);
+}
+
+/* --------------------------------- render --------------------------------- */
+
+/* ============================== RENDER PARTS ============================== */
+function drawWall(px,py,tx,ty){
+  ctx.fillStyle = "#141c27";
+  ctx.fillRect(px,py,TS,TS);
+  ctx.fillStyle = "#1b2634";
+  ctx.fillRect(px+2,py+2,TS-4,TS-4);
+  ctx.fillStyle = "rgba(67,224,200,.05)";
+  ctx.fillRect(px+2,py+2,TS-4,2);
+  ctx.strokeStyle = "#0a0f16"; ctx.lineWidth=1;
+  ctx.strokeRect(px+.5,py+.5,TS-1,TS-1);
+}
+function drawFloor(px,py,tx,ty,dark){
+  if(dark){
+    ctx.fillStyle = "#04070b";
+    ctx.fillRect(px,py,TS,TS);
+    ctx.fillStyle = "rgba(67,224,200,.035)";
+    ctx.fillRect(px,py,TS,TS);
+    ctx.strokeStyle = "rgba(67,224,200,.06)"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(px+6,py+TS-6); ctx.lineTo(px+TS-6,py+6); ctx.stroke();
+  } else {
+    ctx.fillStyle = "#0b121b";
+    ctx.fillRect(px,py,TS,TS);
+    ctx.strokeStyle = "rgba(255,255,255,.028)"; ctx.lineWidth=1;
+    ctx.strokeRect(px+.5,py+.5,TS-1,TS-1);
+  }
+}
+function drawDoor(px,py){
+  ctx.fillStyle = "#1d2f3d"; ctx.fillRect(px,py,TS,TS);
+  ctx.fillStyle = "#43e0c8"; ctx.fillRect(px+4,py+TS/2-2,TS-8,3);
+}
+function drawExitMarker(px,py,t){
+  const pulse = .4+.3*Math.sin(t*4);
+  ctx.strokeStyle = "rgba(67,224,200,"+pulse+")"; ctx.lineWidth=3;
+  ctx.strokeRect(px+6,py+6,TS-12,TS-12);
+  ctx.fillStyle = "rgba(67,224,200,"+(pulse*.35)+")";
+  ctx.fillRect(px+6,py+6,TS-12,TS-12);
+}
+
+/* ---------------- vision cone (raycast against walls) ---------------- */
+function drawCone(e){
+  if(e.dead) return;
+  const range = (e.state==="chase") ? e.vr*0.8 : e.vr*0.72;
+  const spread = e.vf;
+  const steps = 24;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(e.x,e.y);
+  for(let i=0;i<=steps;i++){
+    const a = e.angle - spread + (spread*2)*(i/steps);
+    let len = range;
+    const stepsR = Math.ceil(range/10);
+    for(let s=1;s<=stepsR;s++){
+      const t=s/stepsR, xx=e.x+Math.cos(a)*range*t, yy=e.y+Math.sin(a)*range*t;
+      if(solidAtPx(xx,yy)){ len = range*t; break; }
+    }
+    ctx.lineTo(e.x+Math.cos(a)*len, e.y+Math.sin(a)*len);
+  }
+  ctx.closePath();
+  let col;
+  if(e.state==="chase") col = "255,77,94";
+  else if(e.detect>0.3) col = "255,177,59";
+  else col = "67,224,200";
+  const alpha = e.state==="chase" ? .20 : .11;
+  const grad = ctx.createRadialGradient(e.x,e.y,8,e.x,e.y,range);
+  grad.addColorStop(0,"rgba("+col+","+alpha+")");
+  grad.addColorStop(1,"rgba("+col+",0)");
+  ctx.fillStyle = grad; ctx.fill();
+  ctx.restore();
+}
+
+/* ------------------------------ entities ------------------------------ */
+function drawPlayer(p){
+  ctx.save();
+  ctx.translate(p.x,p.y);
+  ctx.fillStyle="rgba(0,0,0,.45)";
+  ctx.beginPath(); ctx.ellipse(0,6,p.r,p.r*.5,0,0,7); ctx.fill();
+  ctx.rotate(p.angle);
+  if(p.dodge>0) ctx.globalAlpha=.55;
+  const flash = p.hitFlash>0;
+  const body = flash? "#ffffff" : (p.sneaking? "#2c6f66" : "#43e0c8");
+  const dark = flash? "#dddddd" : "#123a36";
+  ctx.fillStyle = dark;
+  ctx.fillRect(-4,-9,8,6);
+  ctx.fillRect(-4,3,8,6);
+  ctx.fillStyle = body;
+  ctx.beginPath(); ctx.arc(0,0,p.r-2,0,7); ctx.fill();
+  ctx.fillStyle = flash? "#fff" : "#9ff5e6";
+  ctx.beginPath(); ctx.arc(2,0,5.2,0,7); ctx.fill();
+  if(p.attacking>0){
+    const ext = p.atkKind==="heavy" ? 22 : 15;
+    ctx.strokeStyle = p.atkKind==="heavy" ? "#ffd08a" : "#ffffff";
+    ctx.lineWidth = p.atkKind==="heavy"? 6:4; ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(4,-6); ctx.lineTo(ext,-3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(4,6); ctx.lineTo(ext,3); ctx.stroke();
+  }
+  ctx.restore();
+  if(p.dodge>0){
+    ctx.strokeStyle="rgba(67,224,200,.4)"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r+5,0,7); ctx.stroke();
+  }
+  Game.enemies.forEach(e=>{
+    if(e.dead||e.boss) return;
+    const d=Math.hypot(e.x-p.x,e.y-p.y);
+    if(d<48+e.r && e.state!=="chase"){
+      const facing = Math.abs(angDiff(Math.atan2(p.y-e.y,p.x-e.x), e.angle));
+      if(facing>1.5){
+        ctx.fillStyle="rgba(67,224,200,.92)"; ctx.font="bold 12px 'Noto Sans Bengali',sans-serif";
+        ctx.textAlign="center";
+        ctx.fillText("[E] টেকডাউন", e.x, e.y-e.r-12);
+      }
+    }
+  });
+}
+
+function drawEnemy(e){
+  if(e.dead){
+    ctx.save(); ctx.globalAlpha=.35; ctx.translate(e.x,e.y); ctx.rotate(e.angle);
+    ctx.fillStyle="#5a2a30"; ctx.beginPath(); ctx.ellipse(0,0,15,7,0,0,7); ctx.fill();
+    ctx.restore(); return;
+  }
+  ctx.save();
+  ctx.translate(e.x,e.y);
+  ctx.fillStyle="rgba(0,0,0,.45)";
+  ctx.beginPath(); ctx.ellipse(0,6,e.r,e.r*.5,0,0,7); ctx.fill();
+  ctx.rotate(e.angle);
+  const col = e.hitFlash>0 ? "#ffffff"
+            : e.boss ? (e.state==="chase"?"#ff4d5e":"#c04bff")
+            : e.state==="chase" ? "#ff4d5e"
+            : e.state==="suspicious" ? "#ffb13b"
+            : e.kind==="elite" ? "#ff8b4d" : "#8aa4c0";
+  ctx.fillStyle = e.hitFlash>0? "#fff" : ((e.kind==="elite"||e.boss)? "#3a2030":"#1c2733");
+  ctx.fillRect(-4,-9,8,6); ctx.fillRect(-4,3,8,6);
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.arc(0,0,e.boss?e.r+3:e.r-1,0,7); ctx.fill();
+  ctx.fillStyle = "#e9f3ff";
+  ctx.beginPath(); ctx.arc(3,0,4.4,0,7); ctx.fill();
+  ctx.restore();
+
+  if(e.detect>0.02 && !e.boss){
+    const w=30, hh=4;
+    ctx.fillStyle="rgba(0,0,0,.6)"; ctx.fillRect(e.x-w/2, e.y-e.r-13, w, hh);
+    ctx.fillStyle = e.detect>=1? "#ff4d5e" : (e.detect>.5?"#ffb13b":"#43e0c8");
+    ctx.fillRect(e.x-w/2, e.y-e.r-13, w*e.detect, hh);
+  }
+  if(e.state==="chase"){
+    ctx.fillStyle="#ff4d5e"; ctx.font="bold 16px sans-serif"; ctx.textAlign="center";
+    ctx.fillText("!", e.x, e.y-e.r-16);
+  } else if(e.state==="suspicious"){
+    ctx.fillStyle="#ffb13b"; ctx.font="bold 16px sans-serif"; ctx.textAlign="center";
+    ctx.fillText("?", e.x, e.y-e.r-16);
+  }
+  if(e.boss){
+    ctx.fillStyle="rgba(0,0,0,.6)"; ctx.fillRect(e.x-30, e.y-e.r-18, 60, 5);
+    ctx.fillStyle="#c04bff"; ctx.fillRect(e.x-30, e.y-e.r-18, 60*(e.hp/e.maxhp), 5);
+    if(e.name){
+      ctx.fillStyle="#e6c8ff"; ctx.font="bold 11px 'Noto Sans Bengali',sans-serif"; ctx.textAlign="center";
+      ctx.fillText(e.name, e.x, e.y-e.r-24);
+    }
+  }
+}
+
+function drawEffects(){
+  Game.effects.forEach(fx=>{
+    const t = fx.life/fx.max;
+    if(fx.kind==="ring"){
+      ctx.strokeStyle = fx.color; ctx.globalAlpha = t;
+      ctx.lineWidth = 3*t+1;
+      ctx.beginPath(); ctx.arc(fx.x,fx.y, fx.size*(1.4-t), 0, 7); ctx.stroke();
+      ctx.globalAlpha=1;
+    } else if(fx.kind==="text"){
+      ctx.globalAlpha = Math.min(1,t*1.6);
+      ctx.fillStyle = fx.color; ctx.font="bold 14px 'Noto Sans Bengali',sans-serif";
+      ctx.textAlign="center";
+      ctx.fillText(fx.text, fx.x, fx.y - (1-t)*22);
+      ctx.globalAlpha=1;
+    }
+  });
+}
+
+/* -------------------------------- minimap -------------------------------- */
+function drawMinimap(){
+  if(!Game.grid) return;
+  const maxW=148, maxH=104;
+  const scale = Math.min(maxW/(Game.W*TS), maxH/(Game.H*TS));
+  const w=Game.W*TS*scale, h=Game.H*TS*scale;
+  const x = VW - w - 16, y = VH - h - 16;
+  ctx.save();
+  ctx.globalAlpha=.85;
+  ctx.fillStyle="#050a10"; ctx.fillRect(x-4,y-4,w+8,h+8);
+  ctx.strokeStyle="#1d2a3a"; ctx.lineWidth=1; ctx.strokeRect(x-4,y-4,w+8,h+8);
+  for(let ty=0;ty<Game.H;ty++)for(let tx=0;tx<Game.W;tx++){
+    const t=Game.grid[ty][tx];
+    if(t==="#"||t===",") continue;
+    ctx.fillStyle = t==="D" ? "#1d4a44" : "#16222e";
+    ctx.fillRect(x+tx*TS*scale, y+ty*TS*scale, TS*scale+1, TS*scale+1);
+  }
+  ctx.strokeStyle="#43e0c8"; ctx.lineWidth=1.5;
+  ctx.strokeRect(x+Game.level.exit.x*TS*scale-1, y+Game.level.exit.y*TS*scale-1, TS*scale+3, TS*scale+3);
+  Game.objectives.forEach(o=>{
+    if(o.done||o.x===undefined) return;
+    ctx.fillStyle="#ffb13b";
+    ctx.fillRect(x+o.x*TS*scale, y+o.y*TS*scale, 3,3);
+  });
+  Game.enemies.forEach(e=>{
+    if(e.dead) return;
+    ctx.fillStyle = e.boss? "#c04bff" : (e.state==="chase"? "#ff4d5e" : "#8aa4c0");
+    ctx.beginPath(); ctx.arc(x+e.x*scale, y+e.y*scale, 2.6, 0, 7); ctx.fill();
+  });
+  ctx.fillStyle="#43e0c8";
+  ctx.beginPath(); ctx.arc(x+Game.player.x*scale, y+Game.player.y*scale, 3.4, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+/* --------------------------------- render --------------------------------- */
+function draw(){
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.clearRect(0,0,VW,VH);
+  if(!Game.grid) return;
+
+  const sh = Game.shake;
+  const ox = -Game.cam.x + (sh?rand(-sh,sh):0);
+  const oy = -Game.cam.y + (sh?rand(-sh,sh):0);
+  ctx.save(); ctx.translate(ox,oy);
+
+  const x0 = Math.max(0, Math.floor(Game.cam.x/TS)-1);
+  const x1 = Math.min(Game.W-1, Math.ceil((Game.cam.x+VW)/TS)+1);
+  const y0 = Math.max(0, Math.floor(Game.cam.y/TS)-1);
+  const y1 = Math.min(Game.H-1, Math.ceil((Game.cam.y+VH)/TS)+1);
+
+  for(let ty=y0; ty<=y1; ty++){
+    for(let tx=x0; tx<=x1; tx++){
+      const t = Game.grid[ty][tx], px=tx*TS, py=ty*TS;
+      if(t==="#"){ drawWall(px,py,tx,ty); }
+      else if(t===","){ drawFloor(px,py,tx,ty,true); }
+      else {
+        drawFloor(px,py,tx,ty,false);
+        if(t==="D") drawDoor(px,py);
+      }
+    }
+  }
+
+  const ex = Game.level.exit;
+  const othersDone = Game.objectives.slice(0,-1).every(o=>o.done);
+  if(othersDone) drawExitMarker(ex.x*TS, ex.y*TS, Game.time);
+
+  Game.objectives.forEach(o=>{
+    if(o.done||o.x===undefined) return;
+    const px=o.x*TS, py=o.y*TS;
+    const pulse = .5+.5*Math.sin(Game.time*3);
+    ctx.strokeStyle="rgba(255,177,59,"+(.4+pulse*.5)+")"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(px,py,14+pulse*4,0,7); ctx.stroke();
+    ctx.fillStyle="rgba(255,177,59,"+(.12+pulse*.15)+")";
+    ctx.beginPath(); ctx.arc(px,py,14+pulse*4,0,7); ctx.fill();
+  });
+
+  Game.enemies.forEach(drawCone);
+  Game.enemies.forEach(drawEnemy);
+  drawPlayer(Game.player);
+  drawEffects();
+
+  if(inShadow(Game.player.x,Game.player.y) && Game.player.sneaking){
+    ctx.strokeStyle="rgba(67,224,200,.5)"; ctx.lineWidth=2;
+    ctx.setLineDash([4,5]);
+    ctx.beginPath(); ctx.arc(Game.player.x,Game.player.y,Game.player.r+7,0,7); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  ctx.restore();
+
+  const vg = ctx.createRadialGradient(VW/2,VH/2,Math.min(VW,VH)*0.35,VW/2,VH/2,Math.max(VW,VH)*0.72);
+  vg.addColorStop(0,"rgba(0,0,0,0)"); vg.addColorStop(1,"rgba(0,0,0,.5)");
+  ctx.fillStyle=vg; ctx.fillRect(0,0,VW,VH);
+
+  drawMinimap();
+
+  const pad = Game.enemies.find(e=>e.boss && !e.dead);
+  if(pad && pad.state==="chase"){
+    ctx.fillStyle="rgba(5,7,10,.85)"; ctx.fillRect(VW/2-160, 12, 320, 26);
+    ctx.strokeStyle="#c04bff"; ctx.strokeRect(VW/2-160, 12, 320, 26);
+    ctx.fillStyle="#c04bff"; ctx.fillRect(VW/2-158, 14, 316*(pad.hp/pad.maxhp), 22);
+    ctx.fillStyle="#fff"; ctx.font="bold 13px 'Noto Sans Bengali',sans-serif"; ctx.textAlign="center";
+    ctx.fillText(pad.name||"BOSS", VW/2, 50);
+  }
+}
+
+/* ============================ INPUT: touch/pad ============================ */
+function setOnce(k){ once[k]=true; }
+const touchState = { joy:{active:false, dx:0, dy:0}, aim:null };
+
+function isTouchDevice(){ return ("ontouchstart" in window) || navigator.maxTouchPoints>0; }
+
+function buildTouchUI(){
+  if(document.getElementById("touchlayer")) return;
+  const layer = document.createElement("div");
+  layer.id = "touchlayer";
+  layer.style.cssText = "position:absolute;inset:0;z-index:8;pointer-events:none;display:none;";
+  const btnCss = "position:absolute;width:62px;height:62px;background:rgba(14,20,29,.85);"+
+    "border:1px solid #43e0c8;color:#43e0c8;border-radius:14px;font-size:24px;font-family:inherit;"+
+    "user-select:none;-webkit-user-select:none;touch-action:none;pointer-events:auto;";
+  layer.innerHTML =
+    '<div id="joybase" style="position:absolute;left:24px;bottom:24px;width:132px;height:132px;'+
+    'border:2px solid rgba(67,224,200,.35);border-radius:50%;pointer-events:auto;background:rgba(8,14,20,.4);touch-action:none"></div>'+
+    '<div id="joyknob" style="position:absolute;left:24px;bottom:24px;width:56px;height:56px;margin:38px;'+
+    'border-radius:50%;background:rgba(67,224,200,.55);pointer-events:none"></div>'+
+    '<button data-k="j" style="'+btnCss+'right:24px;bottom:150px">&#x1F44A;</button>'+
+    '<button data-k="k" style="'+btnCss+'right:98px;bottom:110px">&#x1F9B5;</button>'+
+    '<button data-k=" " style="'+btnCss+'right:24px;bottom:80px">&#x21A9;</button>'+
+    '<button data-k="e" style="'+btnCss+'right:98px;bottom:40px">&#x1F3AF;</button>'+
+    '<button data-k="shift" style="'+btnCss+'right:172px;bottom:70px">&#x1F92B;</button>'+
+    '<button data-k="p" style="'+btnCss+'right:172px;bottom:150px">&#x23F8;</button>';
+  document.getElementById("wrap").appendChild(layer);
+
+  const joybase = layer.querySelector("#joybase");
+  const knob = layer.querySelector("#joyknob");
+  let activeId=null, cx=0, cy=0;
+
+  function joyStart(e){
+    const t = e.changedTouches[0]; activeId=t.identifier;
+    const r = joybase.getBoundingClientRect();
+    cx = r.left+r.width/2; cy = r.top+r.height/2;
+    touchState.joy.active=true; joyMove(e);
+  }
+  function joyMove(e){
+    if(activeId===null) return;
+    for(const t of e.touches){
+      if(t.identifier!==activeId) continue;
+      let dx=t.clientX-cx, dy=t.clientY-cy;
+      const m=Math.hypot(dx,dy), max=54;
+      if(m>max){ dx=dx/m*max; dy=dy/m*max; }
+      knob.style.transform = "translate("+dx+"px,"+dy+"px)";
+      const nx=dx/max, ny=dy/max;
+      keys["a"]=nx<-0.28; keys["d"]=nx>0.28;
+      keys["w"]=ny<-0.28; keys["s"]=ny>0.28;
+      touchState.joy.dx=nx; touchState.joy.dy=ny;
+    }
+  }
+  function joyEnd(e){
+    for(const t of e.changedTouches){ if(t.identifier===activeId) activeId=null; }
+    if(activeId===null){
+      touchState.joy.active=false; knob.style.transform="translate(0,0)";
+      keys["a"]=keys["d"]=keys["w"]=keys["s"]=false;
+    }
+  }
+  joybase.addEventListener("touchstart", e=>{e.preventDefault(); joyStart(e);}, {passive:false});
+  joybase.addEventListener("touchmove",  e=>{e.preventDefault(); joyMove(e);},  {passive:false});
+  joybase.addEventListener("touchend",   e=>{e.preventDefault(); joyEnd(e);},   {passive:false});
+  joybase.addEventListener("touchcancel",e=>{e.preventDefault(); joyEnd(e);},   {passive:false});
+
+  layer.querySelectorAll("button").forEach(b=>{
+    const k = b.getAttribute("data-k");
+    b.addEventListener("touchstart", e=>{ e.preventDefault(); if(!keys[k]) setOnce(k); keys[k]=true;
+      if(k==="p") togglePause(); }, {passive:false});
+    b.addEventListener("touchend", e=>{ e.preventDefault(); keys[k]=false; }, {passive:false});
+    b.addEventListener("touchcancel", e=>{ e.preventDefault(); keys[k]=false; }, {passive:false});
+  });
+
+  cvs.addEventListener("touchstart", e=>{
+    const t=e.changedTouches[0]; const r=cvs.getBoundingClientRect();
+    touchState.aim = {x:t.clientX-r.left, y:t.clientY-r.top};
+  }, {passive:true});
+  cvs.addEventListener("touchmove", e=>{
+    const t=e.changedTouches[0]; const r=cvs.getBoundingClientRect();
+    touchState.aim = {x:t.clientX-r.left, y:t.clientY-r.top};
+  }, {passive:true});
+}
+
+/* ------------- wireless controller (Gamepad API) ------------- */
+function pollGamepad(){
+  if(!navigator.getGamepads) return;
+  const pads = navigator.getGamepads();
+  let pad=null;
+  for(const p of pads){ if(p && p.connected){ pad=p; break; } }
+  if(!pad){ Game.padConnected=null; return; }
+  if(Game.padConnected!==pad.id){
+    Game.padConnected = pad.id;
+    if(Game.player) spawnText(Game.player.x, Game.player.y, "কন্ট্রোলার যুক্ত", "#43e0c8");
+  }
+  const ax = pad.axes || [];
+  const lx = ax[0]||0, ly = ax[1]||0, rx = ax[2]||0, ry = ax[3]||0;
+  const dead = 0.22;
+  if(!touchState.joy.active){
+    if(Math.hypot(lx,ly)>dead){
+      keys["a"]=lx<-dead; keys["d"]=lx>dead;
+      keys["w"]=ly<-dead; keys["s"]=ly>dead;
+    } else {
+      keys["a"]=keys["d"]=keys["w"]=keys["s"]=false;
+    }
+  }
+  Game.padAim = (Math.hypot(rx,ry)>0.3) ? Math.atan2(ry,rx) : null;
+
+  const btn = pad.buttons || [];
+  const map = [
+    {b:0,k:"j"},{b:2,k:"k"},{b:1,k:" "},{b:3,k:"e"},
+    {b:4,k:"shift"},{b:6,k:"shift"},{b:9,k:"p"}
+  ];
+  map.forEach(m=>{
+    const pressed = btn[m.b] && btn[m.b].pressed;
+    if(pressed && !keys[m.k]) setOnce(m.k);
+    keys[m.k] = !!pressed;
+  });
+  [{b:12,k:"w"},{b:13,k:"s"},{b:14,k:"a"},{b:15,k:"d"}].forEach(m=>{
+    if(btn[m.b] && btn[m.b].pressed) keys[m.k]=true;
+  });
+}
+addEventListener("gamepadconnected", e=>{
+  Game.padConnected = e.gamepad.id;
+  if(Game.player) spawnText(Game.player.x, Game.player.y, "কন্ট্রোলার যুক্ত", "#43e0c8");
+});
+addEventListener("gamepaddisconnected", ()=>{ Game.padConnected=null; });
+
+/* ================================ LOOP ================================ */
+function pickAim(){
+  const p = Game.player;
+  if(Game.padAim!==null && Game.padAim!==undefined) return Game.padAim;
+  if(touchState.aim) return Math.atan2(touchState.aim.y-(p.y-Game.cam.y), touchState.aim.x-(p.x-Game.cam.x));
+  return Math.atan2(mouse.y-(p.y-Game.cam.y), mouse.x-(p.x-Game.cam.x));
+}
+
+const _origUpdate = update;
+update = function(dt){
+  _origUpdate(dt);
+  if(Game.state==="play" && Game.player) Game.player.angle = pickAim();
+};
+
+let lastT = performance.now();
+function frame(now){
+  const dt = Math.min(0.033, (now-lastT)/1000);
+  lastT = now;
+  pollGamepad();
+  update(dt);
+  draw();
+  requestAnimationFrame(frame);
+}
+
+/* =============================== BOOT =============================== */
+document.getElementById("start").addEventListener("click", ()=>{
+  document.getElementById("menu").classList.remove("on");
+  document.getElementById("hud").classList.add("on");
+  loadLevel(0);
+  if(isTouchDevice()) document.getElementById("touchlayer").style.display="block";
+});
+document.getElementById("again").addEventListener("click", ()=>{
+  document.getElementById("over").classList.remove("on");
+  loadLevel(Game.levelIndex);
+});
+
+buildTouchUI();
+resize();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
