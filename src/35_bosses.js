@@ -23,7 +23,10 @@ function attachEnemyMethods(e){
     if(this.isBoss) f*=0.12;
     const dx=this.pos.x-Player.pos.x, dz=this.pos.z-Player.pos.z;
     const l=Math.hypot(dx,dz)||1;
-    this.vel.x+=dx/l*f; this.vel.z+=dz/l*f;
+    // cap the impulse so light weapons cannot punt an enemy across the map
+    const imp=Math.min(f,7.5);
+    this.kx=(this.kx||0)+(dx/l)*imp;
+    this.kz=(this.kz||0)+(dz/l)*imp;
   };
   e.applySlow=function(dur,mul){ this.slow=dur; this.slowMul=mul; };
   e.die=function(){
@@ -226,8 +229,22 @@ var Bosses = {
     this.animateBoss(e,dt);
   },
   moveBoss(e,vx,vz,dt){
-    e.vel.x=vx; e.vel.z=vz;
-    e.pos.x+=vx*dt; e.pos.z+=vz*dt;
+    // bosses share the impulse model so their charges/lunges actually carry
+    const decay=Math.pow(0.035,dt);
+    e.kx=(e.kx||0)*decay; e.kz=(e.kz||0)*decay;
+    if(Math.abs(e.kx)<0.05) e.kx=0;
+    if(Math.abs(e.kz)<0.05) e.kz=0;
+    let dvx=0,dvz=0;
+    if(e.dashT>0){
+      const dr=Math.pow(0.18,dt);
+      e.dashVX=(e.dashVX||0)*dr; e.dashVZ=(e.dashVZ||0)*dr;
+      dvx=e.dashVX; dvz=e.dashVZ;
+    }
+    const tvx=vx+e.kx+dvx, tvz=vz+e.kz+dvz;
+    e.vel.x=tvx; e.vel.z=tvz;
+    e.pos.x+=tvx*dt; e.pos.z+=tvz*dt;
+    const bx=CFG.world.sizeX*0.47, bz=CFG.world.sizeZ*0.47;
+    e.pos.x=clamp(e.pos.x,-bx,bx); e.pos.z=clamp(e.pos.z,-bz,bz);
     const gh=terrainHeight(e.pos.x,e.pos.z);
     e.pos.y=gh;
     if(e.group){ e.group.position.set(e.pos.x,e.pos.y,e.pos.z); e.group.rotation.y=e.yaw; }

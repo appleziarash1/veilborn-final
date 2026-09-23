@@ -194,16 +194,21 @@ const Camera = {
       dir.normalize();
       const tmp=World.tmpArr4||(World.tmpArr4=[]);
       let hitAt=len;
-      for(let s=1;s<=5;s++){
-        const f=(s/5)*len;
+      for(let s=1;s<=6;s++){
+        const f=(s/6)*len;
         const tx=P.x+dir.x*f, tz=P.z+dir.z*f;
-        World.hash.query(tx,tz,1.2,tmp);
+        World.hash.query(tx,tz,1.6,tmp);
         for(let k=0;k<tmp.length;k++){
           const c=tmp[k];
-          if(c.top>desired.y&&c.r>1.0&&Math.hypot(tx-c.x,tz-c.z)<c.r*0.9){
-            hitAt=Math.min(hitAt,f*0.85);
+          // A prop blocks the camera when it is tall enough to matter and the
+          // sample lies inside its footprint. Comparing against the CAMERA's
+          // own height (rather than the prop's top) is what stops the camera
+          // from ending up buried inside shrines, houses and pillars.
+          if(c.top>P.y+0.9 && c.r>0.8 && Math.hypot(tx-c.x,tz-c.z)<c.r*0.95){
+            hitAt=Math.min(hitAt,f*0.9);
           }
         }
+        if(hitAt<len) break;
       }
       if(hitAt<len){
         const shrink=hitAt/len;

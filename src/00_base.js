@@ -305,7 +305,10 @@ function bindInput(){
 /* ==========================================================================
    SECTION 3 - THREE.JS INITIALISATION (+ lightweight custom bloom composer)
    ========================================================================== */
-let renderer, scene, camera, clock, sunLight, hemiLight;
+let renderer, scene, camera, clock, sunLight, hemiLight, ambLight;
+// Sun rig: the directional light is kept at a fixed offset from the player so
+// its (finite) shadow frustum always covers the area being played.
+const SunRig = { off:new THREE.Vector3(-90,140,70), active:true };
 let rtScene, rtBright, rtBlurA, rtBlurB, fsQuad, fsCam, fsScene, bloomMatA, bloomMatB, compMat;
 let bloomAmount=1.0, renderScale=1.0, shadowsOn=1, farDist=340;
 let blankTex=null;   // 1x1 black texture used when bloom is off
@@ -318,25 +321,30 @@ function initThree(){
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.06;
+  renderer.toneMappingExposure = 1.35;
   document.getElementById('gl').appendChild(renderer.domElement);
 
   scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x2a2620, 0.0075);
-  scene.background = new THREE.Color(0x151318);
+  scene.fog = new THREE.FogExp2(0x5c574c, 0.0042);
+  scene.background = new THREE.Color(0x2e3240);
 
   camera = new THREE.PerspectiveCamera(CFG.cam.fov, window.innerWidth/window.innerHeight, 0.28, farDist+220);
   clock = new THREE.Clock();
 
-  hemiLight = new THREE.HemisphereLight(0x8fa0bb, 0x2a2118, 0.55);
+  hemiLight = new THREE.HemisphereLight(0xa8bcd8, 0x4a3f30, 1.25);
   scene.add(hemiLight);
-  sunLight = new THREE.DirectionalLight(0xffe0b0, 1.15);
+  // A small ambient term guarantees no surface is ever pure black; without it
+  // unlit sides of props crush to #0b0b0b and the frame reads as half-empty.
+  ambLight = new THREE.AmbientLight(0x8a94ac, 0.42);
+  scene.add(ambLight);
+  sunLight = new THREE.DirectionalLight(0xffe8c0, 1.7);
   sunLight.position.set(-90, 140, 70);
   sunLight.castShadow = true;
-  sunLight.shadow.mapSize.set(1024,1024);
+  sunLight.shadow.mapSize.set(2048,2048);
   const sc = sunLight.shadow.camera;
-  sc.left=-70; sc.right=70; sc.top=70; sc.bottom=-70; sc.near=1; sc.far=420;
-  sunLight.shadow.bias = -0.0016;
+  sc.left=-95; sc.right=95; sc.top=95; sc.bottom=-95; sc.near=1; sc.far=520;
+  sunLight.shadow.bias = -0.0012;
+  sunLight.shadow.normalBias = 0.035;
   scene.add(sunLight); scene.add(sunLight.target);
 
   const opts={minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, format:THREE.RGBAFormat};
@@ -374,12 +382,15 @@ function initThree(){
       'gl_FragColor=vec4(s,1.0); }'
   });
   compMat = new THREE.ShaderMaterial({
-    uniforms:{tScene:{value:null}, tBloom:{value:null}, strength:{value:0.95}, vig:{value:0.5}, tint:{value:new THREE.Color(1,0.97,0.93)}},
+    uniforms:{tScene:{value:null}, tBloom:{value:null}, strength:{value:0.95}, vig:{value:0.4}, lift:{value:0.045}, tint:{value:new THREE.Color(1,0.985,0.96)}},
     vertexShader:V,
-    fragmentShader:'varying vec2 vUv; uniform sampler2D tScene; uniform sampler2D tBloom; uniform float strength; uniform float vig; uniform vec3 tint;\n'+
+    fragmentShader:'varying vec2 vUv; uniform sampler2D tScene; uniform sampler2D tBloom; uniform float strength; uniform float vig; uniform float lift; uniform vec3 tint;\n'+
       'void main(){ vec3 base=texture2D(tScene,vUv).rgb; vec3 bloom=texture2D(tBloom,vUv).rgb;\n'+
-      'vec3 c=base+bloom*strength; float d=distance(vUv,vec2(0.5));\n'+
-      'c*=1.0-smoothstep(0.42,0.98,d)*vig; c=tint*c;\n'+
+      'vec3 c=base+bloom*strength;\n'+
+      // subtle shadow lift so dark regions keep readable shape, then vignette + tint
+      'c+=lift*(1.0-smoothstep(0.0,0.35,dot(c,vec3(0.333))));\n'+
+      'float d=distance(vUv,vec2(0.5));\n'+
+      'c*=1.0-smoothstep(0.45,1.0,d)*vig; c=tint*c;\n'+
       'gl_FragColor=vec4(c,1.0); }'
   });
   resizeRenderer();
@@ -654,8 +665,8 @@ function noiseFill(ctx,size,base,amp){
 }
 const TEX = {
   init(){
-    this.rock = canvasTex(128,(c,s)=>noiseFill(c,s,0.62,0.5),1);
-    this.dirt = canvasTex(96,(c,s)=>noiseFill(c,s,0.55,0.6),1);
+    this.rock = canvasTex(128,(c,s)=>noiseFill(c,s,0.88,0.34),1);
+    this.dirt = canvasTex(96,(c,s)=>noiseFill(c,s,0.90,0.30),1);
     this.bark = canvasTex(64,(c,s)=>{
       const img=c.createImageData(s,s);
       for(let y=0;y<s;y++)for(let x=0;x<s;x++){
@@ -717,44 +728,44 @@ const TEX = {
 const REGIONS = [
   { id:'village', name:'ASHEN VILLAGE', sub:'The Hearth is Cold', idx:0,
     c:{x:-460,z:0}, radius:205, plateau:4, flat:0.55, wallAmp:10,
-    fogColor:0x3b332a, fogD:0.0125, hemi:[0x8d8676,0x2f2822,0.5], sun:0xffca8a, sunI:0.85, sky:0x1b1713,
-    ground:0x4a4239, rock:0x54504a, acc:[0xff8a3d,0xffd070],
+    fogColor:0x8a7962, fogD:0.0044, hemi:[0xa89880,0x4a4038,1.25], sun:0xffca8a, sunI:1.25, sky:0x4e463a,
+    ground:0x8a7d68, rock:0x9a9084, acc:[0xff8a3d,0xffd070],
     hFn:(x,z,t)=>Math.sin(x*0.06)*1.2+Math.cos(z*0.07)*1.2+t*2.0,
     arena:{x:-430,z:120,r:26} },
   { id:'forest', name:'WHISPERING FOREST', sub:'Where Roots Remember', idx:1,
     c:{x:-190,z:-190}, radius:215, plateau:6, flat:0.42, wallAmp:14,
-    fogColor:0x1e2a22, fogD:0.017, hemi:[0x7fa08a,0x1d2018,0.55], sun:0xbfe0b0, sunI:0.62, sky:0x101a13,
-    ground:0x2c3a28, rock:0x3a4636, acc:[0x9fe07a,0x5fd6a0],
+    fogColor:0x6d9478, fogD:0.0034, hemi:[0x9fc4a8,0x3f4a38,1.95], sun:0xcfe8c0, sunI:1.55, sky:0x4a6350,
+    ground:0x6b8a5e, rock:0x7d9a80, acc:[0x9fe07a,0x5fd6a0], amb:0.95,
     hFn:(x,z,t)=>Math.sin(x*0.05)*1.8+Math.sin(z*0.045)*1.8+t*3.5,
     arena:{x:-160,z:-230,r:28} },
   { id:'mines', name:'FORGOTTEN MINES', sub:'Digging Toward the Dark', idx:2,
     c:{x:40,z:150}, radius:200, plateau:2, flat:0.6, wallAmp:12,
-    fogColor:0x2c241c, fogD:0.019, hemi:[0x8a7a5c,0x1a1410,0.42], sun:0xffb877, sunI:0.5, sky:0x14100c,
-    ground:0x463b2e, rock:0x504434, acc:[0xffb040,0xff8030],
+    fogColor:0x7d6748, fogD:0.0060, hemi:[0xa8926a,0x3a3020,1.20], sun:0xffb877, sunI:0.95, sky:0x403624,
+    ground:0x84745a, rock:0x968467, acc:[0xffb040,0xff8030],
     hFn:(x,z,t)=>Math.sin(x*0.08)*2.2+Math.cos(z*0.09)*2.2-t*2.0,
     arena:{x:70,z:170,r:26} },
   { id:'caverns', name:'CRYSTAL CAVERNS', sub:'Light Beneath the World', idx:3,
     c:{x:-140,z:340}, radius:200, plateau:-6, flat:0.7, wallAmp:16,
-    fogColor:0x101c2c, fogD:0.032, hemi:[0x6fa8d0,0x0a1018,0.6], sun:0x88c8ff, sunI:0.32, sky:0x050a12,
-    ground:0x2a3646, rock:0x36485c, acc:[0x5fd0e8,0x8f7ad8],
+    fogColor:0x466a8c, fogD:0.0072, hemi:[0x8fc4e8,0x1c2836,1.40], sun:0x88c8ff, sunI:0.8, sky:0x28374f,
+    ground:0x4e6284, rock:0x6a86a6, acc:[0x5fd0e8,0x8f7ad8],
     hFn:(x,z,t)=>Math.sin(x*0.07)*2.6+Math.cos(z*0.06)*2.6,
     arena:{x:-120,z:390,r:28} },
   { id:'cathedral', name:'FROZEN CATHEDRAL', sub:'A Prayer Held in Ice', idx:4,
     c:{x:200,z:360}, radius:205, plateau:10, flat:0.55, wallAmp:15,
-    fogColor:0x37404c, fogD:0.016, hemi:[0xc8dcef,0x2a3038,0.72], sun:0xdceaff, sunI:0.72, sky:0x1c2430,
-    ground:0xb9c8d6, rock:0x8fa3b5, acc:[0xdff0ff,0x7fd8ff],
+    fogColor:0xa8bccd, fogD:0.0046, hemi:[0xdfeaf7,0x5a6472,1.50], sun:0xdceaff, sunI:1.35, sky:0x6e7f92,
+    ground:0xdfeaf4, rock:0xb8cade, acc:[0xdff0ff,0x7fd8ff],
     hFn:(x,z,t)=>Math.sin(x*0.05)*1.5+Math.cos(z*0.055)*1.5+t*4,
     arena:{x:230,z:400,r:30} },
   { id:'citadel', name:'SCORCHED CITADEL', sub:'The Throne of Cinders', idx:5,
     c:{x:420,z:60}, radius:210, plateau:6, flat:0.6, wallAmp:18,
-    fogColor:0x2b1a12, fogD:0.020, hemi:[0x9a6a48,0x1a0d07,0.42], sun:0xffa050, sunI:0.55, sky:0x170a06,
-    ground:0x3a2c22, rock:0x44302a, acc:[0xff7a2a,0xffd070],
+    fogColor:0xb0714a, fogD:0.0038, hemi:[0xc08050,0x4a2818,1.95], sun:0xffb070, sunI:1.7, sky:0x6e3a24,
+    ground:0x8a6a52, rock:0x9c7a62, acc:[0xff7a2a,0xffd070], amb:1.0,
     hFn:(x,z,t)=>Math.sin(x*0.06)*2.0+Math.cos(z*0.07)*2.0+t*2.5,
     arena:{x:440,z:80,r:32} },
   { id:'sunforge', name:'THE SUN FORGE', sub:'Where Light Was Made', idx:6,
     c:{x:150,z:-40}, radius:215, plateau:14, flat:0.6, wallAmp:20,
-    fogColor:0x4a3a24, fogD:0.011, hemi:[0xffe0a8,0x3a2810,0.66], sun:0xfff0c0, sunI:1.0, sky:0x2a2014,
-    ground:0x5a4a34, rock:0x6a5a40, acc:[0xffd070,0xffb040],
+    fogColor:0xa8894c, fogD:0.0046, hemi:[0xffe8b8,0x6a4a20,1.60], sun:0xfff0c0, sunI:1.6, sky:0x6e5734,
+    ground:0xa88c5e, rock:0xc0a274, acc:[0xffd070,0xffb040],
     hFn:(x,z,t)=>Math.sin(x*0.04)*2.0+Math.cos(z*0.045)*2.0+t*3.0,
     arena:{x:150,z:-80,r:40} }
 ];

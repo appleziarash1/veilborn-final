@@ -105,7 +105,7 @@ function makeEnemy(key, x, z, level, elite){
     hurtFlash:0, hitstop:0, dying:0, deathDone:false, group:null, parts:{}, ph:rr(0,TAU),
     fly:T.fly||0, flyPhase:rr(0,TAU), ghostFade:1, summons:0, animT:0, lastAtk:0,
     attackChain:0, dodgeCD:0, dashT:0, target:null, isBoss:false, ring:null,
-    spawnFx:1.2, dormant:false
+    spawnFx:1.2, dormant:false, kx:0, kz:0, onGround:true
   };
   e.hpMax=Math.round(T.hp*scale*(elite?2.1:1));
   e.hp=e.hpMax;
@@ -354,6 +354,10 @@ const Enemies = {
     const wasAlive=e.alive;
     // aggro by proximity / being struck
     if(!e.aggro && dist<e.det && this.canSee(e)){ e.aggro=true; e.alertT=4; if(e.T.sound) Audio2.play(e.T.sound,{vol:0.5}); }
+    // While the player remains in sight the enemy stays engaged. alertT alone
+    // is a give-up timer, so without this refresh a foe would lose interest
+    // mid-fight and stroll back to its patrol route.
+    if(e.aggro && dist<e.det*1.35 && this.canSee(e)) e.alertT=Math.max(e.alertT,2.0);
 
     if(e.stagger>0){
       // staggered: no actions
@@ -399,7 +403,7 @@ const Enemies = {
         const reach=e.atkRange;
         if(d>reach*0.86){ tx=nx; tz=nz; }
         if(e.arch==='assassin' && d>6 && d<16 && e.dodgeCD<=0 && e.T.dash){
-          e.dodgeCD=4.2; e.dashT=0.3; e.vel.x=nx*16; e.vel.z=nz*16;
+          e.dodgeCD=4.2; e.dashT=0.3; e.dashVX=nx*16; e.dashVZ=nz*16;
           Audio2.play('roll',{vol:0.5});
           FX.burst(e.pos.x,e.pos.y+0.4,e.pos.z,10,{color:[0.5,0.4,0.7],speed:4,life:0.4,size:0.3});
         }
@@ -467,8 +471,23 @@ const Enemies = {
     return true;
   },
   moveEnemy(e,vx,vz,dt,animScale){
-    e.vel.x=vx; e.vel.z=vz;
-    e.pos.x+=vx*dt; e.pos.z+=vz*dt;
+    // Knockback is applied as an impulse to e.kx/e.kz and decays over time; the
+    // intended AI movement is added on top so an impulse is never overwritten.
+    const decay=Math.pow(e.onGround===false?0.25:0.035,dt);
+    e.kx=(e.kx||0)*decay; e.kz=(e.kz||0)*decay;
+    if(Math.abs(e.kx)<0.05) e.kx=0;
+    if(Math.abs(e.kz)<0.05) e.kz=0;
+    // dashes/leaps are a directional burst that overrides AI steering briefly,
+    // otherwise the AI's own target vector would cancel it the very next frame
+    let dvx=0,dvz=0;
+    if(e.dashT>0){
+      const dr=Math.pow(0.18,dt);
+      e.dashVX=(e.dashVX||0)*dr; e.dashVZ=(e.dashVZ||0)*dr;
+      dvx=e.dashVX; dvz=e.dashVZ;
+    }
+    const totalVX=vx+e.kx+dvx, totalVZ=vz+e.kz+dvz;
+    e.vel.x=totalVX; e.vel.z=totalVZ;
+    e.pos.x+=totalVX*dt; e.pos.z+=totalVZ*dt;
     // keep out of props
     const tmp=World.tmpArr3||(World.tmpArr3=[]);
     World.hash.query(e.pos.x,e.pos.z,1.6,tmp);
@@ -493,8 +512,16 @@ const Enemies = {
       e.pos.y=damp(e.pos.y,target,6,dt);
     } else {
       const target=gh;
-      if(e.pos.y>target) e.pos.y=Math.max(target, e.pos.y-CFG.gravity*0.5*dt*dt*10);
-      else e.pos.y=target;
+      if(e.pos.y>target){
+        // fall under gravity until the ground is reached
+        e.fallV=(e.fallV||0)+CFG.gravity*dt;
+        e.pos.y+=e.fallV*dt;
+        if(e.pos.y<=target){ e.pos.y=target; e.fallV=0; }
+      } else if(e.pos.y<target){
+        e.pos.y=Math.min(target, e.pos.y+(target-e.pos.y)*Math.min(1,dt*12));
+        e.fallV=0;
+      }
+      e.vel.y=0;
     }
     // avoid falling off borders
     const bx=CFG.world.sizeX*0.47, bz=CFG.world.sizeZ*0.47;
@@ -573,7 +600,7 @@ const Enemies = {
     if(atk==='leap'){
       const dirx=pd.x-e.pos.x, dirz=pd.z-e.pos.z;
       const l=Math.hypot(dirx,dirz)||1;
-      e.vel.x=dirx/l*13; e.vel.z=dirz/l*13; e.dashT=0.42;
+      e.dashVX=dirx/l*13; e.dashVZ=dirz/l*13; e.dashT=0.42;
       e.hop=1;
       Audio2.play('beast',{vol:0.6});
       if(dist<e.atkRange+1.6) D.hurtPlayer(e.dmg*0.95, from, e);
