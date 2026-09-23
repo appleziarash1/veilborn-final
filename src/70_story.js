@@ -38,6 +38,9 @@ const Story = {
     hemiLight.color=new THREE.Color(R.hemi[0]);
     hemiLight.groundColor=new THREE.Color(R.hemi[1]);
     hemiLight.intensity=R.hemi[2];
+    // Per-region ambient floor. Regions built from dark materials (forest
+    // canopy, scorched stone) otherwise crush to near-black in shadow.
+    ambLight.intensity=R.amb!==undefined?R.amb:0.32;
     sunLight.color=new THREE.Color(R.sun);
     sunLight.intensity=R.sunI;
     Quests.onFlag('region_'+R.id);
@@ -408,8 +411,9 @@ const Game = {
     Buffs.clear();
     Camera.init();
     // start at the Ashen Hearth shrine
+    // stand a little to the side of the shrine so the opening camera is clear
     const s=World.shrines[0];
-    Player.spawn(s.x, s.z+7);
+    Player.spawn(s.x+6, s.z+9);
     Player.lastShrine=s;
     this.startPlay();
     // opening sequence
@@ -450,6 +454,15 @@ const Game = {
     document.getElementById('victory').classList.add('hidden');
     this.state='play';
     this.paused=false;
+    // Grab the pointer so mouse-look works immediately. Activation from a
+    // click satisfies the browser's user-gesture requirement, but a load
+    // from cold may not, so a one-shot listener retries on the next click.
+    requestLock();
+    const retry=function(){
+      if(Game.state==='play'&&!UI.isOpen()&&!IN.locked) requestLock();
+      if(IN.locked||Game.state!=='play') document.removeEventListener('mousedown',retry);
+    };
+    document.addEventListener('mousedown',retry);
     // prime the world around the player
     Enemies.clearAll();
     this.populate(true);
@@ -473,7 +486,7 @@ const Game = {
     UI.set('death',false);
     const s=Player.lastShrine;
     Player.dead=false; Player.state='idle';
-    if(s){ Player.pos.set(s.x, terrainHeight(s.x,s.z), s.z+6); }
+    if(s){ Player.pos.set(s.x+6, terrainHeight(s.x+6,s.z+9), s.z+9); }
     const spawnPos=Player.pos.clone();
     Player.spawn(spawnPos.x,spawnPos.z);
     Player.hp=Player.D.hpMax; Player.stam=Player.D.stMax; Player.mana=Player.D.mnMax;
@@ -743,6 +756,14 @@ const Game = {
   // frame still renders exactly one image.
   present(dt){
     const t=Game.time;
+    // The shadow frustum is finite, so the sun rig is re-centred on the player
+    // every frame; without this the world goes unlit/unshadowed far from origin.
+    if(sunLight&&SunRig.active){
+      const P=Player.pos;
+      sunLight.position.set(P.x+SunRig.off.x, SunRig.off.y, P.z+SunRig.off.z);
+      sunLight.target.position.set(P.x, P.y, P.z);
+      sunLight.target.updateMatrixWorld();
+    }
     if(!Cutscene.active){
       FX.update(dt);
       DmgText.update(dt);
@@ -1020,7 +1041,7 @@ function boot(){
                  FX:FX, ItemDefs:ITEM_DEFS, BossDefs:BOSS_DEFS, EnemyTypes:ENEMY_TYPES, Dialogue:Dialogue,
                  Cutscene:Cutscene, Minimap:Minimap, Stats:Stats, StatusFX:StatusFX, terrainHeight:terrainHeight,
                  Quality:Quality, renderer:renderer, scene:scene, renderComposer:renderComposer,
-                 SpatialHash:SpatialHash, Magic:Magic };
+                 camera:camera, SpatialHash:SpatialHash, Magic:Magic };
 }
 if(document.readyState==='complete'||document.readyState==='interactive'){
   setTimeout(boot,0);

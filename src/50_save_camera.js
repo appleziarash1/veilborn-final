@@ -168,7 +168,22 @@ const Camera = {
     this.pitch=clamp(this.pitch,CFG.cam.pitchMin,CFG.cam.pitchMax);
     this.yaw=this.yaw%TAU;
   },
+  /* Consume the mouse motion accumulated since the last frame.
+     Deltas are only collected while pointer lock is held, so this is safe to
+     call unconditionally; it also keeps the buffer from growing without bound
+     when the pointer is free. The wheel is drained here too - the handler only
+     increments a counter, so nothing else would otherwise apply it. */
+  consumeLook(){
+    if(IN.wheel){
+      this.dist=clamp(this.dist+IN.wheel*0.9, CFG.cam.minDist, CFG.cam.maxDist);
+      IN.wheel=0;
+    }
+    if(!IN.mouse.dx&&!IN.mouse.dy) return;
+    this.addLook(IN.mouse.dx, IN.mouse.dy);
+    IN.mouse.dx=0; IN.mouse.dy=0;
+  },
   update(dt,instant){
+    this.consumeLook();
     const P=Player.pos;
     // distance
     this.targetDist=clamp(this.dist, CFG.cam.minDist, CFG.cam.maxDist);
@@ -194,16 +209,21 @@ const Camera = {
       dir.normalize();
       const tmp=World.tmpArr4||(World.tmpArr4=[]);
       let hitAt=len;
-      for(let s=1;s<=5;s++){
-        const f=(s/5)*len;
+      for(let s=1;s<=6;s++){
+        const f=(s/6)*len;
         const tx=P.x+dir.x*f, tz=P.z+dir.z*f;
-        World.hash.query(tx,tz,1.2,tmp);
+        World.hash.query(tx,tz,1.6,tmp);
         for(let k=0;k<tmp.length;k++){
           const c=tmp[k];
-          if(c.top>desired.y&&c.r>1.0&&Math.hypot(tx-c.x,tz-c.z)<c.r*0.9){
-            hitAt=Math.min(hitAt,f*0.85);
+          // A prop blocks the camera when it is tall enough to matter and the
+          // sample lies inside its footprint. Comparing against the CAMERA's
+          // own height (rather than the prop's top) is what stops the camera
+          // from ending up buried inside shrines, houses and pillars.
+          if(c.top>P.y+0.9 && c.r>0.8 && Math.hypot(tx-c.x,tz-c.z)<c.r*0.95){
+            hitAt=Math.min(hitAt,f*0.9);
           }
         }
+        if(hitAt<len) break;
       }
       if(hitAt<len){
         const shrink=hitAt/len;

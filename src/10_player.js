@@ -154,9 +154,11 @@ const Player = {
   wishDir(out){
     const f=(IN.keys.KeyW?1:0)-(IN.keys.KeyS?1:0);
     const s=(IN.keys.KeyD?1:0)-(IN.keys.KeyA?1:0);
+    // Camera sits at P + (-sin yaw, .., -cos yaw)*dist, so its view direction is
+    // (sin yaw, 0, cos yaw). Screen-right is cross(forward, up) = (-cos yaw, 0, sin yaw).
     const cy=Math.cos(Camera.yaw), sy=Math.sin(Camera.yaw);
-    let dx=(-sy)*f+(cy)*s;
-    let dz=(-cy)*f+(-sy)*s;
+    let dx=sy*f-cy*s;
+    let dz=cy*f+sy*s;
     const l=Math.hypot(dx,dz);
     if(l>0.0001){ dx/=l; dz/=l; }
     out.set(dx,0,dz);

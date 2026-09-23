@@ -54,7 +54,7 @@ const World = {
       }
       const hx=terrainHeight(x+4,z), hz=terrainHeight(x,z+4);
       const slope=Math.min(1,(Math.abs(hx-h)+Math.abs(hz-h))/12);
-      const shade=(1-slope*0.35)*(0.78+0.32*fbm(x*0.09,z*0.09,3,2,0.5));
+      const shade=(1-slope*0.22)*(0.92+0.26*fbm(x*0.09,z*0.09,3,2,0.5));
       const frost=smoothstep(48,78,h)*0.55;
       colors[i*3]  =clamp(r*shade+frost*0.60,0,1);
       colors[i*3+1]=clamp(g*shade+frost*0.62,0,1);
@@ -490,7 +490,7 @@ const World = {
       this.instUpdate({mesh:haloM}, si, s.x, h+0.06, s.z, 0, 1,1,1);
       const light=new THREE.PointLight(0xff8a3d, 1.2, 38, 2);
       light.position.set(s.x,h+5.7,s.z); this.group.add(light);
-      this.addCollider(s.x,s.z,3.4,h+1.2,'shrine');
+      this.addCollider(s.x,s.z,3.4,h+4.8,'shrine');   // full column height, so the camera avoids it
       this.shrines.push({id:s.id,name:s.name,region:s.r,x:s.x,z:s.z,y:h,
         flameIndex:si,light:light,lit:false});
     }
