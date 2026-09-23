@@ -168,7 +168,17 @@ const Camera = {
     this.pitch=clamp(this.pitch,CFG.cam.pitchMin,CFG.cam.pitchMax);
     this.yaw=this.yaw%TAU;
   },
+  /* Consume the mouse motion accumulated since the last frame.
+     Deltas are only collected while pointer lock is held, so this is safe to
+     call unconditionally; it also keeps the buffer from growing without bound
+     when the pointer is free. */
+  consumeLook(){
+    if(!IN.mouse.dx&&!IN.mouse.dy) return;
+    this.addLook(IN.mouse.dx, IN.mouse.dy);
+    IN.mouse.dx=0; IN.mouse.dy=0;
+  },
   update(dt,instant){
+    this.consumeLook();
     const P=Player.pos;
     // distance
     this.targetDist=clamp(this.dist, CFG.cam.minDist, CFG.cam.maxDist);
