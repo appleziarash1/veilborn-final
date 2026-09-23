@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>FORGE OF THE FALLEN KING</title>
+<style>
+/* ============================================================================
+   SECTION 3 - CSS  (dark fantasy UI, fully responsive, single file)
+   ========================================================================== */
+:root{
+  --gold:#d9b26a; --gold-dim:#8d7440; --ember:#ff8a3d; --blood:#8e1f1f;
+  --ice:#7fd8ff; --arcane:#b48cff; --ink:#0a0908; --panel:rgba(12,10,9,.92);
+  --panel2:rgba(24,20,17,.92); --line:rgba(217,178,106,.35);
+  --hp:#a8231f; --st:#3fa86b; --mn:#3f6fd8; --xp:#c9a24a;
+  --ui: clamp(11px, 0.95vw, 15px);
+}
+*{box-sizing:border-box; -webkit-user-select:none; user-select:none;}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#000;color:#e8e0d2;
+  font-family:"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;}
+canvas{display:block;}
+#gl{position:fixed;inset:0;width:100%;height:100%;}
+.hidden{display:none !important;}
+#app{position:fixed;inset:0;pointer-events:none;}
+.panel{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);
+  box-shadow:0 0 0 1px rgba(0,0,0,.7) inset, 0 12px 40px rgba(0,0,0,.75);border-radius:3px;}
+.gold{color:var(--gold);}
+h1,h2,h3{font-weight:normal;letter-spacing:.14em;text-transform:uppercase;margin:0;}
+
+/* ---------------- loading ---------------- */
+#boot{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 40%,#241a10,#000 70%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;gap:18px;}
+#boot h1{font-size:clamp(20px,3.4vw,44px);color:var(--gold);text-shadow:0 0 24px rgba(217,178,106,.45);}
+#boot .sub{color:#9a8f7c;font-size:var(--ui);letter-spacing:.3em;}
+#bootbar{width:min(520px,72vw);height:8px;background:#1a1512;border:1px solid var(--line);}
+#bootbar i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#7a5a24,var(--gold),#fff2cf);
+  transition:width .25s;box-shadow:0 0 12px rgba(217,178,106,.6);}
+#bootmsg{font-size:var(--ui);color:#8b8069;letter-spacing:.12em;}
+
+/* ---------------- main menu ---------------- */
+#menu{position:fixed;inset:0;z-index:150;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:clamp(10px,2vh,26px);
+  background:radial-gradient(ellipse at 50% 70%,rgba(60,26,8,.55),rgba(0,0,0,.94) 65%),#000;}
+#menu .title{font-size:clamp(26px,5.2vw,72px);color:var(--gold);text-align:center;line-height:1.05;
+  text-shadow:0 0 40px rgba(255,138,61,.35),0 0 6px rgba(217,178,106,.8);}
+#menu .tag{color:#a4957c;font-size:var(--ui);letter-spacing:.34em;text-align:center;}
+#menu .btns{display:flex;flex-direction:column;gap:8px;width:min(340px,78vw);pointer-events:auto;}
+.mbtn{pointer-events:auto;cursor:pointer;padding:11px 16px;text-align:center;letter-spacing:.18em;
+  text-transform:uppercase;font-size:var(--ui);color:#e2d8c4;background:linear-gradient(180deg,rgba(40,32,24,.95),rgba(14,12,10,.95));
+  border:1px solid var(--line);border-radius:2px;transition:.16s;}
+.mbtn:hover{color:#fff;border-color:var(--gold);background:linear-gradient(180deg,rgba(74,56,34,.98),rgba(26,20,14,.98));
+  box-shadow:0 0 18px rgba(217,178,106,.3);transform:translateY(-1px);}
+.mbtn[disabled]{opacity:.35;cursor:not-allowed;}
+.mbtn small{display:block;font-size:.78em;letter-spacing:.06em;color:#8e8574;text-transform:none;margin-top:2px;}
+#menu .foot{position:absolute;bottom:12px;font-size:calc(var(--ui) * .82);color:#6b6355;letter-spacing:.14em;text-align:center;}
+
+/* ---------------- HUD ---------------- */
+#hud{position:absolute;inset:0;}
+#bars{position:absolute;left:clamp(10px,1.4vw,26px);bottom:clamp(10px,2vh,26px);width:clamp(210px,24vw,380px);}
+.bar{position:relative;height:clamp(11px,1.35vh,18px);margin-top:5px;background:rgba(8,7,6,.86);
+  border:1px solid rgba(217,178,106,.32);border-radius:2px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.6);}
+.bar>i{position:absolute;inset:0;transform-origin:left center;display:block;}
+.bar>span{position:absolute;inset:0;font-size:calc(var(--ui)*.72);line-height:1.7;text-align:center;
+  letter-spacing:.16em;text-shadow:0 1px 2px #000;color:#f0e8d8;}
+#hpF{background:linear-gradient(180deg,#d3453c,#7d1410);z-index:2;}
+#hpE{background:rgba(255,120,60,.28);transition:transform .45s ease-out;z-index:1;}
+#stF{background:linear-gradient(180deg,#63d193,#1f6b41);}
+#mnF{background:linear-gradient(180deg,#6f9cf5,#22408f);}
+#xpF{background:linear-gradient(180deg,#e8c469,#8b6a1c);}
+#bars .mini{display:flex;justify-content:space-between;font-size:calc(var(--ui)*.74);color:#b9ab8e;
+  letter-spacing:.14em;margin-top:7px;}
+#lvlbadge{position:absolute;left:clamp(10px,1.4vw,26px);bottom:calc(clamp(10px,2vh,26px) + clamp(78px,8.6vh,110px));
+  width:clamp(44px,4.6vh,58px);height:clamp(44px,4.6vh,58px);border-radius:50%;
+  background:radial-gradient(circle at 40% 35%,#3a2c17,#120e08);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;flex-direction:column;box-shadow:0 0 18px rgba(217,178,106,.24);}
+#lvlbadge b{font-size:calc(var(--ui)*1.25);color:var(--gold);}
+#lvlbadge em{font-style:normal;font-size:calc(var(--ui)*.6);color:#8b8069;letter-spacing:.1em;}
+#statusEffects{position:absolute;left:clamp(64px,7.2vh,86px);bottom:calc(clamp(10px,2vh,26px) + clamp(78px,8.6vh,110px));
+  display:flex;gap:6px;flex-wrap:wrap;max-width:220px;}
+.eff{font-size:calc(var(--ui)*.72);padding:3px 7px;border:1px solid var(--line);border-radius:2px;
+  background:rgba(10,8,7,.85);letter-spacing:.08em;}
+#weapons{position:absolute;right:clamp(10px,1.4vw,26px);bottom:clamp(10px,2vh,26px);display:flex;gap:6px;}
+.wslot{width:clamp(42px,4.4vh,54px);height:clamp(42px,4.4vh,54px);border:1px solid rgba(217,178,106,.28);
+  border-radius:3px;background:linear-gradient(180deg,rgba(30,25,19,.92),rgba(8,7,6,.92));
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:calc(var(--ui)*.62);color:#9c9182;letter-spacing:.06em;text-align:center;line-height:1.15;}
+.wslot.on{border-color:var(--gold);color:#fff;box-shadow:0 0 16px rgba(217,178,106,.4);}
+#spells{position:absolute;right:clamp(10px,1.4vw,26px);bottom:calc(clamp(10px,2vh,26px) + clamp(60px,6.4vh,76px));
+  display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:min(300px,34vw);}
+.spell{position:relative;width:clamp(38px,4vh,48px);height:clamp(38px,4vh,48px);border:1px solid rgba(180,140,255,.3);
+  border-radius:3px;background:linear-gradient(180deg,rgba(26,20,36,.92),rgba(8,6,12,.92));
+  display:flex;align-items:center;justify-content:center;font-size:calc(var(--ui)*1.15);overflow:hidden;}
+.spell .cd{position:absolute;inset:0;background:rgba(0,0,0,.72);transform-origin:bottom;transform:scaleY(0);}
+.spell.locked{opacity:.28;}
+#bossbar{position:absolute;top:clamp(56px,8vh,92px);left:50%;transform:translateX(-50%);
+  width:min(720px,72vw);text-align:center;}
+#bossbar .name{font-size:calc(var(--ui)*1.05);letter-spacing:.3em;color:#f0d9a8;text-shadow:0 0 14px rgba(0,0,0,.9);margin-bottom:4px;}
+#bossbar .bar{height:clamp(12px,1.6vh,20px);border-color:rgba(217,178,106,.55);}
+#bossF{background:linear-gradient(180deg,#e0553f,#6d1008);}
+#bossbar .bar em{position:absolute;inset:0;background:rgba(255,255,255,.2);transform-origin:left;display:block;}
+#bossbar .phase{font-size:calc(var(--ui)*.72);color:#c8b48c;letter-spacing:.24em;margin-top:3px;}
+#region{position:absolute;top:clamp(50px,7vh,84px);left:50%;transform:translateX(-50%);text-align:center;
+  transition:opacity 1s;opacity:0;}
+#region b{display:block;font-size:calc(var(--ui)*1.5);letter-spacing:.42em;color:var(--gold);
+  text-shadow:0 0 22px rgba(255,138,61,.4),0 2px 4px #000;}
+#region i{font-style:normal;font-size:calc(var(--ui)*.8);letter-spacing:.22em;color:#a89a80;}
+#objective{position:absolute;top:clamp(12px,2vh,22px);right:clamp(10px,1.4vw,26px);width:min(280px,30vw);
+  padding:9px 12px;font-size:calc(var(--ui)*.84);}
+#objective h3{font-size:calc(var(--ui)*.74);color:var(--gold);letter-spacing:.24em;margin-bottom:6px;}
+#objective .q{margin:5px 0 5px 0;line-height:1.35;color:#d8cdb6;}
+#objective .q b{color:#f2e7cf;display:block;font-weight:normal;letter-spacing:.06em;}
+#objective .q span{color:#a89a80;font-size:.92em;}
+#objective .q.done b{color:#8fbf8f;text-decoration:line-through;opacity:.65;}
+#prompt{position:absolute;left:50%;top:58%;transform:translateX(-50%);padding:8px 16px;text-align:center;
+  font-size:var(--ui);letter-spacing:.12em;border-color:rgba(217,178,106,.6);}
+#prompt kbd{background:#2a2218;border:1px solid var(--line);border-radius:3px;padding:1px 6px;color:var(--gold);}
+#dmgVig{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .25s;
+  background:radial-gradient(ellipse at center,rgba(0,0,0,0) 42%,rgba(140,10,10,.72) 100%);}
+#lowHp{position:absolute;inset:0;pointer-events:none;opacity:0;
+  background:radial-gradient(ellipse at center,rgba(0,0,0,0) 45%,rgba(120,0,0,.5) 100%);}
+#combo{position:absolute;left:50%;top:44%;transform:translateX(-50%);font-size:calc(var(--ui)*1.9);
+  color:#ffe0a0;letter-spacing:.14em;text-shadow:0 0 20px rgba(255,138,61,.7);opacity:0;transition:opacity .2s;}
+#toast{position:absolute;left:50%;bottom:calc(clamp(10px,2vh,26px) + clamp(120px,13vh,160px));transform:translateX(-50%);
+  display:flex;flex-direction:column;gap:4px;align-items:center;width:min(560px,84vw);}
+.toast{font-size:calc(var(--ui)*.84);padding:5px 12px;background:rgba(8,7,6,.8);border-left:2px solid var(--gold);
+  letter-spacing:.1em;color:#e6dcc6;animation:fadeOut 4.6s forwards;}
+@keyframes fadeOut{0%{opacity:0;transform:translateY(6px);}8%{opacity:1;transform:none;}80%{opacity:1;}100%{opacity:0;}}
+#minimapWrap{position:absolute;top:clamp(12px,2vh,22px);left:clamp(10px,1.4vw,26px);width:clamp(120px,15vh,188px);padding:5px;}
+#minimapWrap .lbl{font-size:calc(var(--ui)*.66);color:#a89a80;letter-spacing:.2em;text-align:center;margin-top:3px;}
+#minimap{width:100%;display:block;border:1px solid rgba(217,178,106,.2);background:#070605;}
+
+/* ---------------- overlays / screens ---------------- */
+.screen{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;
+  background:rgba(4,3,3,.82);backdrop-filter:blur(3px);pointer-events:auto;padding:2vh 2vw;}
+.screen .inner{width:min(1080px,94vw);max-height:94vh;overflow:auto;padding:clamp(12px,2vh,26px);}
+.screen h2{font-size:clamp(16px,2vw,26px);color:var(--gold);margin-bottom:12px;letter-spacing:.3em;}
+.screen h3{font-size:var(--ui);color:var(--gold);letter-spacing:.22em;margin:14px 0 8px;}
+.row{display:flex;gap:14px;flex-wrap:wrap;}
+.col{flex:1 1 260px;min-width:230px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:7px;}
+.card{padding:8px;border:1px solid rgba(217,178,106,.24);background:linear-gradient(180deg,rgba(30,25,19,.9),rgba(10,9,7,.9));
+  border-radius:2px;font-size:calc(var(--ui)*.78);cursor:pointer;transition:.14s;position:relative;}
+.card:hover{border-color:var(--gold);transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.6);}
+.card b{display:block;color:#f0e6d2;font-weight:normal;letter-spacing:.05em;margin-bottom:3px;}
+.card .stat{color:#9d9280;display:block;}
+.card .tag{position:absolute;top:4px;right:5px;font-size:.82em;color:var(--gold);}
+.card.eq{border-color:var(--gold);box-shadow:0 0 14px rgba(217,178,106,.28) inset;}
+.card.no{opacity:.4;cursor:not-allowed;}
+table{width:100%;border-collapse:collapse;font-size:calc(var(--ui)*.83);}
+td,th{padding:5px 7px;border-bottom:1px solid rgba(217,178,106,.14);text-align:left;}
+th{color:var(--gold);font-weight:normal;letter-spacing:.14em;}
+.statline{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dotted rgba(217,178,106,.16);
+  font-size:calc(var(--ui)*.84);}
+.statline b{font-weight:normal;color:#f0e6d2;}
+.plus{pointer-events:auto;cursor:pointer;background:#2c2417;border:1px solid var(--line);color:var(--gold);
+  width:22px;height:20px;line-height:1;border-radius:2px;font-size:11px;}
+.plus:hover{background:#4a3a22;color:#fff;}
+.kv{display:flex;gap:8px;align-items:center;margin:4px 0;font-size:calc(var(--ui)*.84);}
+.kv label{flex:1;}
+input[type=range]{width:min(220px,40vw);accent-color:#d9b26a;background:transparent;}
+.skill{padding:9px;border:1px solid rgba(180,140,255,.22);background:linear-gradient(180deg,rgba(26,20,36,.9),rgba(9,7,14,.9));
+  border-radius:2px;font-size:calc(var(--ui)*.78);}
+.skill b{color:#d9c9ff;font-weight:normal;display:block;margin-bottom:3px;}
+.skill.locked{opacity:.42;}
+.skill.owned{border-color:#b48cff;box-shadow:0 0 14px rgba(180,140,255,.22) inset;}
+.dlgbox{width:min(860px,92vw);padding:16px 20px;}
+.dlgbox .who{color:var(--gold);letter-spacing:.24em;font-size:calc(var(--ui)*1.02);margin-bottom:8px;}
+.dlgbox .line{font-size:calc(var(--ui)*.98);line-height:1.65;color:#e8dfcb;min-height:3.2em;}
+.dlgbox .opts{display:flex;flex-direction:column;gap:5px;margin-top:13px;}
+.opt{pointer-events:auto;cursor:pointer;padding:7px 11px;border:1px solid rgba(217,178,106,.22);
+  font-size:calc(var(--ui)*.88);background:rgba(14,12,10,.7);transition:.14s;}
+.opt:hover{border-color:var(--gold);background:rgba(48,38,24,.9);padding-left:16px;}
+.cut{position:fixed;inset:0;z-index:160;background:#000;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:16px;text-align:center;padding:5vh 6vw;pointer-events:auto;}
+.cut .txt{font-size:clamp(14px,1.7vw,25px);line-height:1.75;color:#e9dfc9;max-width:900px;letter-spacing:.05em;}
+.cut .txt em{color:var(--gold);font-style:normal;letter-spacing:.2em;}
+.cut .skip{position:absolute;bottom:14px;right:18px;font-size:calc(var(--ui)*.8);color:#7d7466;letter-spacing:.16em;}
+#death{background:radial-gradient(ellipse at center,rgba(80,0,0,.5),rgba(0,0,0,.96));}
+#death .inner{text-align:center;}
+#death h2{font-size:clamp(24px,4vw,54px);color:#c9432f;letter-spacing:.36em;text-shadow:0 0 40px rgba(200,60,40,.5);}
+#victory{background:radial-gradient(ellipse at center,rgba(120,80,10,.35),rgba(0,0,0,.96));}
+#victory h2{font-size:clamp(20px,3.4vw,46px);letter-spacing:.32em;}
+.tabbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+.tab{pointer-events:auto;cursor:pointer;padding:6px 12px;font-size:calc(var(--ui)*.8);letter-spacing:.14em;
+  border:1px solid var(--line);color:#b7ab93;text-transform:uppercase;background:rgba(14,12,10,.7);}
+.tab.on{color:#000;background:linear-gradient(180deg,#e0c07f,#a8873c);border-color:#f0dca8;}
+::-webkit-scrollbar{width:9px;height:9px;}::-webkit-scrollbar-track{background:#0c0a09;}
+::-webkit-scrollbar-thumb{background:#3a2f20;border:1px solid var(--line);}
+#fps{position:absolute;bottom:6px;right:10px;font-size:calc(var(--ui)*.66);color:#6c6455;letter-spacing:.1em;}
+#pauseBtns{display:flex;flex-direction:column;gap:7px;width:min(320px,80vw);margin:0 auto;}
+#hitmark{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:26px;height:26px;opacity:0;
+  transition:opacity .16s;}
+#hitmark:before,#hitmark:after{content:"";position:absolute;background:#fff;box-shadow:0 0 6px #000;}
+#hitmark:before{left:50%;top:0;width:2px;height:100%;transform:translateX(-50%) rotate(45deg);}
+#hitmark:after{top:50%;left:0;height:2px;width:100%;transform:translateY(-50%) rotate(45deg);}
+#cross{position:absolute;left:50%;top:50%;width:6px;height:6px;transform:translate(-50%,-50%);
+  border:1px solid rgba(240,220,180,.55);border-radius:50%;opacity:.5;}
+@media (max-width:900px){
+  #objective{width:min(210px,42vw);}
+  #minimapWrap{width:112px;}
+  #spells{max-width:150px;}
+}
+@media (max-height:620px){
+  .bar{height:9px;}
+  #objective{font-size:calc(var(--ui)*.76);}
+}
+</style>
+</head>
+<body>
+<div id="gl"></div>
+
+<!-- ==========================================================================
+     SECTION 2 - HTML UI (HUD, menus, overlays, dialogue)
+     ======================================================================== -->
+<div id="app">
+  <div id="hud" class="hidden">
+    <div id="cross"></div>
+    <div id="hitmark"></div>
+    <div id="dmgVig"></div>
+    <div id="lowHp"></div>
+    <div id="lvlbadge"><b id="lvlNum">1</b><em>LVL</em></div>
+    <div id="statusEffects"></div>
+    <div id="bars">
+      <div class="bar"><i id="hpE"></i><i id="hpF"></i><span id="hpTxt">100 / 100</span></div>
+      <div class="bar"><i id="stF"></i><span id="stTxt">100 / 100</span></div>
+      <div class="bar"><i id="mnF"></i><span id="mnTxt">60 / 60</span></div>
+      <div class="bar" style="height:7px"><i id="xpF"></i></div>
+      <div class="mini"><span id="xpTxt">XP 0 / 100</span><span id="goldTxt">0 gold</span></div>
+    </div>
+    <div id="weapons"></div>
+    <div id="spells"></div>
+    <div id="bossbar" class="hidden">
+      <div class="name" id="bossName">THE ASH WARDEN</div>
+      <div class="bar"><i id="bossF"></i><em id="bossE"></em></div>
+      <div class="phase" id="bossPhase">PHASE I</div>
+    </div>
+    <div id="region"><b id="regionName">ASHEN VILLAGE</b><i id="regionSub">The Hearth is Cold</i></div>
+    <div id="objective" class="panel">
+      <h3>Quest Log</h3>
+      <div id="questList"></div>
+    </div>
+    <div id="minimapWrap" class="panel">
+      <canvas id="minimap" width="200" height="200"></canvas>
+      <div class="lbl" id="mmLabel">ASHEN VILLAGE</div>
+    </div>
+    <div id="prompt" class="panel hidden"><span id="promptTxt"></span></div>
+    <div id="combo"></div>
+    <div id="toast"></div>
+    <div id="fps">--</div>
+  </div>
+
+  <div id="boot">
+    <h1>Forge of the Fallen King</h1>
+    <div class="sub">Kindling the embers...</div>
+    <div id="bootbar"><i></i></div>
+    <div id="bootmsg">Preparing the world</div>
+  </div>
+
+  <div id="menu" class="hidden">
+    <div class="title">Forge of the<br />Fallen King</div>
+    <div class="tag">A Dark Fantasy Action RPG</div>
+    <div class="btns">
+      <div class="mbtn" id="btnContinue">Continue<small id="contInfo"></small></div>
+      <div class="mbtn" id="btnNew">New Game</div>
+      <div class="mbtn" id="btnLoad">Load Game</div>
+      <div class="mbtn" id="btnHelpM">Controls &amp; Help</div>
+    </div>
+    <div class="foot">WASD move &middot; Mouse camera &middot; LMB light &middot; RMB heavy / block &middot; Space dodge &middot; Q magic &middot; E interact &middot; I inventory &middot; M map &middot; Esc pause</div>
+  </div>
+
+  <div id="pause" class="screen hidden">
+    <div class="inner panel">
+      <h2>The World Waits</h2>
+      <div class="row">
+        <div class="col">
+          <div id="pauseBtns">
+            <div class="mbtn" id="btnResume">Resume</div>
+            <div class="mbtn" id="btnSave">Save Game</div>
+            <div class="mbtn" id="btnLoad2">Load Game</div>
+            <div class="mbtn" id="btnSettings">Settings</div>
+            <div class="mbtn" id="btnHelp">Controls</div>
+            <div class="mbtn" id="btnQuit">Quit to Menu</div>
+          </div>
+        </div>
+        <div class="col" id="pauseStats"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="settings" class="screen hidden">
+    <div class="inner panel">
+      <h2>Settings</h2>
+      <div class="row">
+        <div class="col">
+          <h3>Video</h3>
+          <div class="kv"><label>Auto Graphics</label><input type="range" id="setAuto" min="0" max="1" value="1" /><span id="setAutoV">On</span></div>
+          <div class="kv"><label>Quality Preset</label><input type="range" id="setQuality" min="0" max="3" value="3" /><span id="setQualityV">High</span></div>
+          <div class="kv"><label>Render Scale</label><input type="range" id="setScale" min="50" max="130" value="100" /><span id="setScaleV">100%</span></div>
+          <div class="kv"><label>Shadows</label><input type="range" id="setShadow" min="0" max="2" value="1" /><span id="setShadowV">Medium</span></div>
+          <div class="kv"><label>Draw Distance</label><input type="range" id="setFar" min="120" max="520" value="340" /><span id="setFarV">340</span></div>
+          <div class="kv"><label>Post FX / Glow</label><input type="range" id="setBloom" min="0" max="150" value="100" /><span id="setBloomV">100%</span></div>
+          <div class="kv"><label>Particles</label><input type="range" id="setParts" min="0" max="150" value="100" /><span id="setPartsV">100%</span></div>
+        </div>
+        <div class="col">
+          <h3>Audio</h3>
+          <div class="kv"><label>Master</label><input type="range" id="setMaster" min="0" max="100" value="70" /><span id="setMasterV">70%</span></div>
+          <div class="kv"><label>Ambience</label><input type="range" id="setMusic" min="0" max="100" value="45" /><span id="setMusicV">45%</span></div>
+          <div class="kv"><label>Effects</label><input type="range" id="setSfx" min="0" max="100" value="80" /><span id="setSfxV">80%</span></div>
+          <h3>Gameplay</h3>
+          <div class="kv"><label>Camera Sensitivity</label><input type="range" id="setSens" min="20" max="300" value="110" /><span id="setSensV">110</span></div>
+          <div class="kv"><label>Invert Y</label><input type="range" id="setInv" min="0" max="1" value="0" /><span id="setInvV">Off</span></div>
+          <div class="kv"><label>Camera Shake</label><input type="range" id="setShake" min="0" max="150" value="100" /><span id="setShakeV">100%</span></div>
+          <div class="kv"><label>Difficulty</label><input type="range" id="setDiff" min="0" max="2" value="1" /><span id="setDiffV">Warden</span></div>
+        </div>
+      </div>
+      <br /><div class="mbtn" id="btnSettingsBack" style="width:min(280px,70vw)">Back</div>
+    </div>
+  </div>
+
+  <div id="help" class="screen hidden">
+    <div class="inner panel">
+      <h2>Controls &amp; Help</h2>
+      <div class="row">
+        <div class="col">
+          <h3>Movement</h3>
+          <table>
+            <tr><td><kbd>W A S D</kbd></td><td>Move</td></tr>
+            <tr><td><kbd>Mouse</kbd></td><td>Orbit camera</td></tr>
+            <tr><td><kbd>Shift</kbd></td><td>Sprint (drains stamina)</td></tr>
+            <tr><td><kbd>Space</kbd></td><td>Jump, or Dodge roll with a direction held</td></tr>
+            <tr><td><kbd>Wheel</kbd></td><td>Camera distance</td></tr>
+            <tr><td><kbd>F</kbd></td><td>Toggle lock-on</td></tr>
+            <tr><td><kbd>Tab</kbd></td><td>Cycle lock-on target</td></tr>
+          </table>
+          <h3>Combat</h3>
+          <table>
+            <tr><td><kbd>Left Click</kbd></td><td>Light attack (3-hit combo, tap again to chain)</td></tr>
+            <tr><td><kbd>Hold Left</kbd></td><td>Charged attack (weapon art)</td></tr>
+            <tr><td><kbd>Right Click</kbd></td><td>Hold to Block, tap for Heavy attack</td></tr>
+            <tr><td><kbd>Right Click (at impact)</kbd></td><td>Parry &mdash; reflect the blow, break their poise</td></tr>
+            <tr><td><kbd>Q</kbd></td><td>Cast selected spell</td></tr>
+            <tr><td><kbd>1</kbd>&ndash;<kbd>5</kbd></td><td>Switch weapon</td></tr>
+            <tr><td><kbd>Z</kbd> / <kbd>X</kbd></td><td>Cycle spell / cycle item</td></tr>
+            <tr><td><kbd>R</kbd></td><td>Drink Ember Flask (heal)</td></tr>
+          </table>
+        </div>
+        <div class="col">
+          <h3>Interface</h3>
+          <table>
+            <tr><td><kbd>E</kbd></td><td>Interact, talk, pick up, light shrine</td></tr>
+            <tr><td><kbd>I</kbd></td><td>Inventory &amp; Equipment</td></tr>
+            <tr><td><kbd>K</kbd></td><td>Skill paths</td></tr>
+            <tr><td><kbd>M</kbd></td><td>World map</td></tr>
+            <tr><td><kbd>J</kbd></td><td>Quest journal</td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>Pause</td></tr>
+            <tr><td><kbd>H</kbd></td><td>This screen</td></tr>
+            <tr><td><kbd>P</kbd></td><td>Screenshot (saves a PNG)</td></tr>
+          </table>
+          <h3>Survival</h3>
+          <p style="font-size:var(--ui);line-height:1.6;color:#c6bba4">
+            Rest at <span class="gold">Ember Shrines</span> to refill your flask, restore health and mana,
+            and resurrect the slain. Shrines are checkpoints: dying returns you to the last shrine you lit,
+            and enemies stay dead until you rest again.<br /><br />
+            <span class="gold">Stagger</span> is your true resource. Heavy blows, parries, and spells break
+            an enemy's poise; broken foes take <span class="gold">critical</span> damage from every strike
+            until they recover. Combos build momentum &mdash; the third hit of a chain hits far harder.<br /><br />
+            Enemies scale with your level, so spend stat points and skill points whenever you have them.
+            You keep your level, gear and quests when you die: only ground is lost.<br /><br />
+            Five Lords hold shards of the Sun Forge. Beyond them, at the Forge itself, three endings wait.
+            What you do with the shards &mdash; and to those who wronged you &mdash; decides which.
+          </p>
+        </div>
+      </div>
+      <br /><div class="mbtn" id="btnHelpBack" style="width:min(280px,70vw)">Back</div>
+    </div>
+  </div>
+
+  <div id="inventory" class="screen hidden">
+    <div class="inner panel">
+      <h2 id="invTitle">Satchel &amp; Arms</h2>
+      <div class="tabbar" id="invTabs">
+        <div class="tab on" data-tab="equip">Equipment</div>
+        <div class="tab" data-tab="weapons">Weapons</div>
+        <div class="tab" data-tab="items">Items</div>
+        <div class="tab" data-tab="lore">Lore</div>
+      </div>
+      <div class="row">
+        <div class="col" id="invLeft"></div>
+        <div class="col" id="invRight"></div>
+      </div>
+      <br /><div class="mbtn" id="btnInvBack" style="width:min(280px,70vw)">Close</div>
+    </div>
+  </div>
+
+  <div id="skills" class="screen hidden">
+    <div class="inner panel">
+      <h2>Paths of Power</h2>
+      <div class="kv"><label>Skill Points Available</label><b class="gold" id="spAvail">0</b></div>
+      <div class="row" id="skillCols"></div>
+      <br /><div class="mbtn" id="btnSkillsBack" style="width:min(280px,70vw)">Close</div>
+    </div>
+  </div>
+
+  <div id="quests" class="screen hidden">
+    <div class="inner panel">
+      <h2>Quest Journal</h2>
+      <div class="row">
+        <div class="col" id="qMain"></div>
+        <div class="col" id="qSide"></div>
+      </div>
+      <br /><div class="mbtn" id="btnQuestsBack" style="width:min(280px,70vw)">Close</div>
+    </div>
+  </div>
+
+  <div id="map" class="screen hidden">
+    <div class="inner panel">
+      <h2>Map of the Broken Kingdom</h2>
+      <canvas id="bigmap" width="900" height="660" style="width:100%;max-height:62vh;border:1px solid var(--line);background:#070605"></canvas>
+      <br /><br /><div class="mbtn" id="btnMapBack" style="width:min(280px,70vw)">Close</div>
+    </div>
+  </div>
+
+  <div id="dialogue" class="screen hidden">
+    <div class="inner dlgbox panel" style="width:min(880px,92vw)">
+      <div class="who" id="dlgWho">NPC</div>
+      <div class="line" id="dlgLine"></div>
+      <div class="opts" id="dlgOpts"></div>
+    </div>
+  </div>
+
+  <div id="death" class="screen hidden">
+    <div class="inner">
+      <h2>YOU DIED</h2>
+      <p style="color:#b09a86;letter-spacing:.2em;font-size:var(--ui)" id="deathTip">The embers remember you.</p>
+      <br /><div class="mbtn" id="btnRespawn" style="width:min(300px,76vw);margin:0 auto">Rise Again</div>
+      <br /><div class="mbtn" id="btnDeathLoad" style="width:min(300px,76vw);margin:0 auto">Load Game</div>
+    </div>
+  </div>
+
+  <div id="victory" class="screen hidden">
+    <div class="inner panel">
+      <h2 id="vicTitle">The Forge Rekindled</h2>
+      <div id="vicBody" style="font-size:var(--ui);line-height:1.7;color:#dcd2bb"></div>
+      <br /><div class="mbtn" id="btnContPlay" style="width:min(320px,78vw);margin:0 auto">Continue Exploring</div>
+      <br /><div class="mbtn" id="btnVicMenu" style="width:min(320px,78vw);margin:0 auto">Return to Menu</div>
+    </div>
+  </div>
+
+  <div id="cut" class="cut hidden">
+    <div class="txt" id="cutTxt"></div>
+    <div class="skip">Press Space / Click to continue</div>
+  </div>
+</div>
+
