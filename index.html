@@ -5337,8 +5337,13 @@ const Camera = {
   /* Consume the mouse motion accumulated since the last frame.
      Deltas are only collected while pointer lock is held, so this is safe to
      call unconditionally; it also keeps the buffer from growing without bound
-     when the pointer is free. */
+     when the pointer is free. The wheel is drained here too - the handler only
+     increments a counter, so nothing else would otherwise apply it. */
   consumeLook(){
+    if(IN.wheel){
+      this.dist=clamp(this.dist+IN.wheel*0.9, CFG.cam.minDist, CFG.cam.maxDist);
+      IN.wheel=0;
+    }
     if(!IN.mouse.dx&&!IN.mouse.dy) return;
     this.addLook(IN.mouse.dx, IN.mouse.dy);
     IN.mouse.dx=0; IN.mouse.dy=0;
